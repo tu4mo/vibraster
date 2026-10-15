@@ -2,7 +2,9 @@
 
 A small in-browser raster image editor built with React and [Mantine](https://mantine.dev).
 
-- Open PNG, JPEG, WebP or GIF files (button, drag and drop, or paste)
+![Vibraster editing a sunset image, with a selection around the sun and the selection action bar open](docs/screenshot.jpg)
+
+- Open PNG, JPEG, WebP or GIF files (File menu, drag and drop, or paste)
 - Rectangle selection with resize handles (Shift keeps the aspect ratio): fill with color, delete to transparency, move
 - Resize the image (scale) or the canvas (crop / extend, new area filled with the background color)
 - Undo / redo, zoom, save as PNG
