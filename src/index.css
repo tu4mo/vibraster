@@ -1,0 +1,198 @@
+/* Mantine provides the base styles and theme; this file only styles the canvas area. */
+
+:root {
+  --checker-a: #ffffff;
+  --checker-b: #d4d4d8;
+  --viewport-bg: var(--mantine-color-gray-1);
+  /* Matches Mantine's Menubar item hover so all header and toolbox buttons agree. */
+  --hover-bg: var(--mantine-color-gray-1);
+}
+
+[data-mantine-color-scheme="dark"] {
+  --checker-a: #3f3f46;
+  --checker-b: #27272a;
+  --viewport-bg: var(--mantine-color-dark-8);
+  --hover-bg: var(--mantine-color-dark-5);
+}
+
+.viewport {
+  display: flex;
+  height: calc(100dvh - var(--app-shell-header-offset, 0px) - var(--app-shell-footer-offset, 0px));
+  overflow: auto;
+  padding: 32px;
+  background: var(--viewport-bg);
+}
+
+.stage {
+  position: relative;
+  flex: none;
+  margin: auto;
+  background-color: var(--checker-a);
+  background-image: conic-gradient(
+    var(--checker-b) 25%,
+    transparent 0 50%,
+    var(--checker-b) 0 75%,
+    transparent 0
+  );
+  background-size: 16px 16px;
+  box-shadow: var(--mantine-shadow-md);
+  touch-action: none;
+  user-select: none;
+  cursor: crosshair;
+
+  &[data-tool="move"] {
+    cursor: move;
+  }
+
+  &[data-tool="zoom"] {
+    cursor: zoom-in;
+  }
+
+  &[data-zoom-out] {
+    cursor: zoom-out;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+
+    &.pixelated {
+      image-rendering: pixelated;
+    }
+  }
+}
+
+.selection {
+  position: absolute;
+  /* Events bubble to the stage; this only sets the cursor. */
+  cursor: move;
+  /* Marching ants: black/white dashes on each edge. */
+  background:
+    linear-gradient(90deg, #000 50%, #fff 0) 0 0 / 8px 1px repeat-x,
+    linear-gradient(90deg, #000 50%, #fff 0) 0 100% / 8px 1px repeat-x,
+    linear-gradient(0deg, #000 50%, #fff 0) 0 0 / 1px 8px repeat-y,
+    linear-gradient(0deg, #000 50%, #fff 0) 100% 0 / 1px 8px repeat-y;
+  animation: ants 0.6s linear infinite;
+
+  [data-tool="zoom"] > & {
+    cursor: inherit;
+  }
+}
+
+.handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px;
+  background: #fff;
+  border: 1px solid #000;
+
+  &[data-handle="nw"] {
+    left: 0;
+    top: 0;
+    cursor: nwse-resize;
+  }
+  &[data-handle="n"] {
+    left: 50%;
+    top: 0;
+    cursor: ns-resize;
+  }
+  &[data-handle="ne"] {
+    left: 100%;
+    top: 0;
+    cursor: nesw-resize;
+  }
+  &[data-handle="e"] {
+    left: 100%;
+    top: 50%;
+    cursor: ew-resize;
+  }
+  &[data-handle="se"] {
+    left: 100%;
+    top: 100%;
+    cursor: nwse-resize;
+  }
+  &[data-handle="s"] {
+    left: 50%;
+    top: 100%;
+    cursor: ns-resize;
+  }
+  &[data-handle="sw"] {
+    left: 0;
+    top: 100%;
+    cursor: nesw-resize;
+  }
+  &[data-handle="w"] {
+    left: 0;
+    top: 50%;
+    cursor: ew-resize;
+  }
+}
+
+@keyframes ants {
+  to {
+    background-position:
+      8px 0,
+      -8px 100%,
+      0 -8px,
+      100% 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selection {
+    animation: none;
+  }
+}
+
+/* Fill / background swatches: a ring in the panel color separates the overlap,
+   and a thin outer edge keeps white or black swatches visible in either theme. */
+.color-swatch {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 2px var(--mantine-color-body),
+    0 0 0 3px var(--mantine-color-default-border);
+}
+
+.brand {
+  font-family: "Pixelify Sans", var(--mantine-font-family-headings);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.main {
+  position: relative;
+}
+
+/* Floats the selection ActionBar over the bottom of the canvas area. */
+.action-bar-dock {
+  position: absolute;
+  inset-inline: 0;
+  /* Main is padded under the footer, so lift the bar above it. */
+  bottom: calc(var(--app-shell-footer-offset, 0px) + 20px);
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+.tabular,
+.zoom-level {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Disabled toolbar buttons: fade out instead of Mantine's filled disabled style. */
+:is(.mantine-ActionIcon-root, .mantine-Button-root)[data-variant="subtle"]:is(
+    :disabled,
+    [data-disabled]
+  ) {
+  background: transparent;
+  opacity: 0.35;
+  color: inherit;
+}
