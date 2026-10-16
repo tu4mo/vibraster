@@ -165,20 +165,13 @@
   line-height: 1;
 }
 
-.main {
-  position: relative;
-}
+.palette-grip {
+  color: var(--mantine-color-dimmed);
+  cursor: grab;
+  touch-action: none;
 
-/* Floats the selection ActionBar over the bottom of the canvas area. */
-.action-bar-dock {
-  position: absolute;
-  inset-inline: 0;
-  /* Main is padded under the footer, so lift the bar above it. */
-  bottom: calc(var(--app-shell-footer-offset, 0px) + 20px);
-  pointer-events: none;
-
-  > * {
-    pointer-events: auto;
+  &:active {
+    cursor: grabbing;
   }
 }
 

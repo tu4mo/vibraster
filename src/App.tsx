@@ -6,6 +6,7 @@ import {
   Center,
   ColorSwatch,
   Divider,
+  FloatingWindow,
   EmptyState,
   Group,
   Menu,
@@ -24,6 +25,7 @@ import {
   IconEraser,
   IconFolderOpen,
   IconFrame,
+  IconGripHorizontal,
   IconMarquee2,
   IconMinus,
   IconPhoto,
@@ -44,6 +46,10 @@ import { useEditor } from "./editor/useEditor.ts";
 
 const ZOOM_STEPS = [0.05, 0.1, 0.25, 1 / 3, 0.5, 2 / 3, 1, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32];
 const ACCEPT = "image/png,image/jpeg,image/webp,image/gif,image/bmp";
+const HEADER_HEIGHT = 52;
+const FOOTER_HEIGHT = 28;
+/** Gap kept between the tool palette and the window, header and status bar. */
+const PALETTE_MARGIN = 8;
 const ICON = { size: 18, stroke: 1.75 };
 const MENU_ICON = { size: 16, stroke: 1.75 };
 
@@ -70,6 +76,19 @@ export default function App() {
   const [dialog, setDialog] = useState<"image" | "canvas" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
+  const palette = useRef<HTMLDivElement>(null);
+
+  // FloatingWindow only keeps the palette inside the browser window; also keep
+  // it off the header and status bar. This runs in the same drag step that
+  // moved it, before paint, so the correction never shows.
+  const keepPaletteBelowHeader = useCallback(({ y }: { y: number }) => {
+    const el = palette.current;
+    if (!el) return;
+    const min = HEADER_HEIGHT + PALETTE_MARGIN;
+    const max = window.innerHeight - FOOTER_HEIGHT - PALETTE_MARGIN - el.offsetHeight;
+    const clamped = Math.min(Math.max(y, min), max);
+    if (clamped !== y) el.style.top = `${clamped}px`;
+  }, []);
 
   const hasImage = editor.image !== null;
   const hasSelection = editor.selection !== null;
@@ -195,13 +214,7 @@ export default function App() {
   }, [openFile]);
 
   return (
-    <AppShell
-      header={{ height: 52 }}
-      // 34px buttons + 8px padding each side + 1px border.
-      navbar={{ width: 51, breakpoint: 0 }}
-      footer={{ height: 28 }}
-      padding={0}
-    >
+    <AppShell header={{ height: HEADER_HEIGHT }} footer={{ height: FOOTER_HEIGHT }} padding={0}>
       <AppShell.Header>
         <Group h="100%" px="sm" gap="sm" wrap="nowrap">
           <Title order={1} className="brand">
@@ -333,8 +346,26 @@ export default function App() {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p={8}>
+      {/* Tool palette: drag it by the grip at the top. */}
+      <FloatingWindow
+        withBorder
+        shadow="md"
+        radius="md"
+        p={8}
+        ref={palette}
+        initialPosition={{ top: HEADER_HEIGHT + 16, left: 16 }}
+        constrainToViewport
+        constrainOffset={PALETTE_MARGIN}
+        onPositionChange={keepPaletteBelowHeader}
+        dragHandleSelector=".palette-grip"
+        // Above the app shell (100) but below modals (200) and popovers/tooltips (300).
+        zIndex={150}
+        aria-label="Tools"
+      >
         <Stack gap={4} align="center">
+          <Center className="palette-grip" w={34} h={12} aria-hidden>
+            <IconGripHorizontal size={14} />
+          </Center>
           <Stack gap={4} role="radiogroup" aria-label="Tools">
             {TOOLS.map(({ value, label, shortcut, icon: Icon }) => (
               <Tip key={value} label={label} shortcut={shortcut} position="right">
@@ -363,9 +394,9 @@ export default function App() {
             onSwap={swapColors}
           />
         </Stack>
-      </AppShell.Navbar>
+      </FloatingWindow>
 
-      <AppShell.Main className="main">
+      <AppShell.Main>
         <div
           ref={viewport}
           className="viewport"
@@ -402,34 +433,33 @@ export default function App() {
             </Center>
           )}
         </div>
-        <div className="action-bar-dock">
-          <ActionBar opened={hasSelection} onClose={() => editor.setSelection(null)} shadow="md">
-            <Text size="sm" c="dimmed" className="tabular">
-              {editor.selection?.w} × {editor.selection?.h}
-            </Text>
-            <ActionBar.Divider />
-            <Button
-              variant="subtle"
-              color="gray"
-              size="compact-sm"
-              leftSection={<ColorSwatch color={foreground} size={14} />}
-              onClick={() => editor.fill(foreground)}
-            >
-              Fill
-            </Button>
-            <Button
-              variant="subtle"
-              color="red"
-              size="compact-sm"
-              leftSection={<IconEraser size={16} />}
-              onClick={() => editor.deleteSelection()}
-            >
-              Delete
-            </Button>
-            <ActionBar.Divider />
-            <ActionBar.CloseButton aria-label="Deselect" />
-          </ActionBar>
-        </div>
+        {/* Mantine positions this itself, fixed above the status bar. */}
+        <ActionBar opened={hasSelection} onClose={() => editor.setSelection(null)} shadow="md">
+          <Text size="sm" c="dimmed" className="tabular">
+            {editor.selection?.w} × {editor.selection?.h}
+          </Text>
+          <ActionBar.Divider />
+          <Button
+            variant="subtle"
+            color="gray"
+            size="compact-sm"
+            leftSection={<ColorSwatch color={foreground} size={14} />}
+            onClick={() => editor.fill(foreground)}
+          >
+            Fill
+          </Button>
+          <Button
+            variant="subtle"
+            color="red"
+            size="compact-sm"
+            leftSection={<IconEraser size={16} />}
+            onClick={() => editor.deleteSelection()}
+          >
+            Delete
+          </Button>
+          <ActionBar.Divider />
+          <ActionBar.CloseButton aria-label="Deselect" />
+        </ActionBar>
       </AppShell.Main>
 
       <AppShell.Footer>
@@ -446,12 +476,6 @@ export default function App() {
               <Text size="xs" c="dimmed">
                 {editor.width} × {editor.height} px
               </Text>
-              {editor.selection && (
-                <Text size="xs" c="dimmed">
-                  Selection {editor.selection.w} × {editor.selection.h} at {editor.selection.x},{" "}
-                  {editor.selection.y}
-                </Text>
-              )}
             </>
           ) : (
             <Text size="xs" c="dimmed">
