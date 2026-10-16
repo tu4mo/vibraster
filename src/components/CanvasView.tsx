@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { clamp, useMergedRef, useWindowEvent } from "@mantine/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Rect } from "../editor/canvas.ts";
 import type { Editor } from "../editor/Editor.ts";
 
@@ -27,29 +28,54 @@ type Drag =
 
 type Props = {
   editor: Editor;
+  /**
+   * The editor's change counter. The editor is mutated in place, so this prop
+   * is what tells a memoizing parent (React Compiler) to render this again.
+   */
   version: number;
   tool: Tool;
   zoom: number;
   /** Fills the gap left behind when moving pixels. */
   background: string;
-  onZoomAt: (
-    direction: 1 | -1,
-    imageX: number,
-    imageY: number,
-    clientX: number,
-    clientY: number,
-  ) => void;
+  /** Zoom tool click; the clicked point is kept under the cursor. */
+  onZoom: (direction: 1 | -1) => void;
+  /** The scrolling viewport, which the parent measures to fit the zoom. */
+  ref?: React.Ref<HTMLDivElement>;
 };
 
-export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }: Props) {
+/**
+ * The scrolling viewport with the image in it. The whole viewport is the
+ * pointer surface, so a selection can start on the empty area around the image.
+ */
+export function CanvasView({ editor, tool, zoom, background, onZoom, ref }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const mergedViewportRef = useMergedRef(viewportRef, ref);
   const drag = useRef<Drag | null>(null);
+  /** Image point to keep under the cursor after a zoom tool click. */
+  const zoomAnchor = useRef<{ imageX: number; imageY: number; clientX: number; clientY: number }>(
+    null,
+  );
   const altDown = useAltKey();
 
+  // Selection-only changes don't touch pixels and skip the redraw.
+  const pixelVersion = editor.pixelVersion;
   useEffect(() => {
     if (canvasRef.current) editor.render(canvasRef.current);
-  }, [editor, version]);
+  }, [editor, pixelVersion]);
+
+  // After a zoom tool click, scroll so the clicked point stays under the cursor.
+  useLayoutEffect(() => {
+    const anchor = zoomAnchor.current;
+    const stage = stageRef.current;
+    const viewport = viewportRef.current;
+    zoomAnchor.current = null;
+    if (!anchor || !stage || !viewport) return;
+    const rect = stage.getBoundingClientRect();
+    viewport.scrollLeft += rect.left + anchor.imageX * zoom - anchor.clientX;
+    viewport.scrollTop += rect.top + anchor.imageY * zoom - anchor.clientY;
+  }, [zoom]);
 
   /** Pointer position in image pixels (fractional, unclamped). */
   const toImage = (e: { clientX: number; clientY: number }) => {
@@ -57,12 +83,68 @@ export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }
     return { x: (e.clientX - rect.left) / zoom, y: (e.clientY - rect.top) / zoom };
   };
 
-  const clampX = (x: number) => Math.min(editor.width, Math.max(0, Math.round(x)));
-  const clampY = (y: number) => Math.min(editor.height, Math.max(0, Math.round(y)));
+  const clampX = (x: number) => clamp(Math.round(x), 0, editor.width);
+  const clampY = (y: number) => clamp(Math.round(y), 0, editor.height);
 
-  const onDragMove = (e: PointerEvent) => {
+  /** The drag a press starts, or null when it starts none. */
+  const startDrag = (e: React.PointerEvent, onEmptyArea: boolean): Drag | null => {
+    const p = toImage(e);
+    const sel = editor.selection;
+    const handle = (e.target as HTMLElement).dataset.handle as Handle | undefined;
+    const inside =
+      sel && p.x >= sel.x && p.y >= sel.y && p.x <= sel.x + sel.w && p.y <= sel.y + sel.h;
+
+    if (tool === "zoom") {
+      if (onEmptyArea) {
+        editor.setSelection(null);
+      } else {
+        zoomAnchor.current = { imageX: p.x, imageY: p.y, clientX: e.clientX, clientY: e.clientY };
+        onZoom(e.altKey ? -1 : 1);
+      }
+      return null;
+    }
+
+    if (tool === "select") {
+      if (sel && handle) return { kind: "resize", handle, start: sel };
+      if (sel && inside) return { kind: "outline", offsetX: p.x - sel.x, offsetY: p.y - sel.y };
+      editor.setSelection(null);
+      return { kind: "select", startX: clampX(p.x), startY: clampY(p.y) };
+    }
+
+    // Move tool.
+    if (sel && handle) {
+      editor.beginMove(background);
+      const f = editor.floating;
+      if (!f) return null;
+      const ratio = f.source.width / f.source.height;
+      return { kind: "scale", handle, start: sel, flipX: f.flipX, flipY: f.flipY, ratio };
+    }
+    if (sel && inside) {
+      editor.beginMove(background);
+      return { kind: "move", offsetX: p.x - sel.x, offsetY: p.y - sel.y };
+    }
+    if (onEmptyArea) editor.setSelection(null);
+    return null;
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const onEmptyArea = e.target === e.currentTarget;
+    if (onEmptyArea && isOnScrollbar(e.currentTarget, e)) return;
+    drag.current = startDrag(e, onEmptyArea);
+    // Capture keeps the moves coming, and ends the drag, wherever the pointer
+    // goes, even outside the browser window.
+    if (drag.current) e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d) return;
+    // The button was released somewhere we did not hear about.
+    if ((e.buttons & 1) === 0) {
+      drag.current = null;
+      return;
+    }
     const p = toImage(e);
     if (d.kind === "select") {
       const x = clampX(p.x);
@@ -76,8 +158,8 @@ export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }
     } else if (d.kind === "outline" && editor.selection) {
       // Keep the whole outline inside the image so it never shrinks.
       const { w, h } = editor.selection;
-      const x = Math.min(editor.width - w, Math.max(0, Math.round(p.x - d.offsetX)));
-      const y = Math.min(editor.height - h, Math.max(0, Math.round(p.y - d.offsetY)));
+      const x = clamp(Math.round(p.x - d.offsetX), 0, editor.width - w);
+      const y = clamp(Math.round(p.y - d.offsetY), 0, editor.height - h);
       editor.setSelection({ x, y, w, h });
     } else if (d.kind === "resize") {
       // The outline stays inside the image.
@@ -96,112 +178,52 @@ export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }
     }
   };
 
-  const onPointerDown = (e: PointerEvent | React.PointerEvent) => {
-    if (e.button !== 0) return;
-    const p = toImage(e);
-    if (tool === "zoom") {
-      onZoomAt(e.altKey ? -1 : 1, p.x, p.y, e.clientX, e.clientY);
-      return;
-    }
-    const sel = editor.selection;
-    const insideSelection =
-      sel && p.x >= sel.x && p.y >= sel.y && p.x <= sel.x + sel.w && p.y <= sel.y + sel.h;
-    const handle = (e.target as HTMLElement).dataset.handle as Handle | undefined;
-    if (tool === "select" && sel && handle) {
-      drag.current = { kind: "resize", handle, start: sel };
-    } else if (tool === "move" && sel && handle) {
-      editor.beginMove(background);
-      const f = editor.floating;
-      if (!f) return;
-      const ratio = f.source.width / f.source.height;
-      drag.current = { kind: "scale", handle, start: sel, flipX: f.flipX, flipY: f.flipY, ratio };
-    } else if (tool === "select" && sel && insideSelection) {
-      drag.current = { kind: "outline", offsetX: p.x - sel.x, offsetY: p.y - sel.y };
-    } else if (tool === "select") {
-      drag.current = { kind: "select", startX: clampX(p.x), startY: clampY(p.y) };
-      editor.setSelection(null);
-    } else if (sel && insideSelection) {
-      editor.beginMove(background);
-      drag.current = { kind: "move", offsetX: p.x - sel.x, offsetY: p.y - sel.y };
-    } else {
-      return;
-    }
-    // Follow the drag on window so it keeps working (and always ends) when
-    // the pointer leaves the canvas, or even the browser window.
-    const pointerId = e.pointerId;
-    const move = (ev: PointerEvent) => {
-      if (ev.pointerId !== pointerId) return;
-      // The button was released somewhere we did not hear about.
-      if ((ev.buttons & 1) === 0) end();
-      else onDragMove(ev);
-    };
-    const end = () => {
-      drag.current = null;
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", end);
-      window.removeEventListener("pointercancel", end);
-      window.removeEventListener("blur", end);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", end);
-    window.addEventListener("pointercancel", end);
-    window.addEventListener("blur", end);
-    (e.currentTarget as Element).setPointerCapture(pointerId);
-  };
-
-  // The select tool can also start a selection on the empty area around the
-  // image; the selection is clamped to the image as it is dragged.
-  const latestPointerDown = useRef(onPointerDown);
-  useEffect(() => {
-    latestPointerDown.current = onPointerDown;
-  });
-  useEffect(() => {
-    const area = stageRef.current?.parentElement;
-    if (!area || tool !== "select") return;
-    const down = (e: PointerEvent) => {
-      if (e.target !== area) return;
-      // Ignore presses on the area's own scrollbars.
-      const rect = area.getBoundingClientRect();
-      const x = e.clientX - rect.left - area.clientLeft;
-      const y = e.clientY - rect.top - area.clientTop;
-      if (x >= area.clientWidth || y >= area.clientHeight) return;
-      latestPointerDown.current(e);
-    };
-    area.addEventListener("pointerdown", down);
-    return () => area.removeEventListener("pointerdown", down);
-  }, [tool]);
-
   const sel = editor.selection;
 
   return (
     <div
-      ref={stageRef}
-      className="stage"
+      ref={mergedViewportRef}
+      className="viewport"
       data-tool={tool}
       data-zoom-out={tool === "zoom" && altDown ? "" : undefined}
-      style={{ width: editor.width * zoom, height: editor.height * zoom }}
       onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onLostPointerCapture={() => (drag.current = null)}
     >
-      <canvas ref={canvasRef} className={zoom > 1 ? "pixelated" : undefined} />
-      {zoom >= PIXEL_GRID_MIN_ZOOM && (
-        <div className="pixel-grid" style={{ "--cell": `${zoom}px` } as React.CSSProperties} />
-      )}
-      {sel && (
-        <div
-          className="selection"
-          style={{
-            left: sel.x * zoom,
-            top: sel.y * zoom,
-            width: sel.w * zoom,
-            height: sel.h * zoom,
-          }}
-        >
-          {(tool === "select" || tool === "move") &&
-            HANDLES.map((h) => <div key={h} className="handle" data-handle={h} />)}
-        </div>
-      )}
+      <div
+        ref={stageRef}
+        className="stage"
+        style={{ width: editor.width * zoom, height: editor.height * zoom }}
+      >
+        <canvas ref={canvasRef} className={zoom > 1 ? "pixelated" : undefined} />
+        {zoom >= PIXEL_GRID_MIN_ZOOM && (
+          <div className="pixel-grid" style={{ "--cell": `${zoom}px` } as React.CSSProperties} />
+        )}
+        {sel && (
+          <div
+            className="selection"
+            style={{
+              left: sel.x * zoom,
+              top: sel.y * zoom,
+              width: sel.w * zoom,
+              height: sel.h * zoom,
+            }}
+          >
+            {(tool === "select" || tool === "move") &&
+              HANDLES.map((h) => <div key={h} className="handle" data-handle={h} />)}
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+/** Whether a press on `el` landed on its own scrollbar rather than its content. */
+function isOnScrollbar(el: HTMLElement, e: { clientX: number; clientY: number }) {
+  const rect = el.getBoundingClientRect();
+  const x = e.clientX - rect.left - el.clientLeft;
+  const y = e.clientY - rect.top - el.clientTop;
+  return x >= el.clientWidth || y >= el.clientHeight;
 }
 
 type Bounds = { width: number; height: number };
@@ -221,17 +243,16 @@ function resizeRect(
 ): { rect: Rect; flipX: boolean; flipY: boolean } | null {
   if (ratio) return resizeKeepingRatio(handle, start, p, ratio, bounds);
 
-  const clamp = (v: number, max: number) =>
-    bounds ? Math.min(max, Math.max(0, Math.round(v))) : Math.round(v);
+  const fit = (v: number, max: number) => (bounds ? clamp(Math.round(v), 0, max) : Math.round(v));
   // Move only the edges the handle controls.
   let x1 = start.x;
   let y1 = start.y;
   let x2 = start.x + start.w;
   let y2 = start.y + start.h;
-  if (handle.includes("w")) x1 = clamp(p.x, bounds?.width ?? 0);
-  if (handle.includes("e")) x2 = clamp(p.x, bounds?.width ?? 0);
-  if (handle.includes("n")) y1 = clamp(p.y, bounds?.height ?? 0);
-  if (handle.includes("s")) y2 = clamp(p.y, bounds?.height ?? 0);
+  if (handle.includes("w")) x1 = fit(p.x, bounds?.width ?? 0);
+  if (handle.includes("e")) x2 = fit(p.x, bounds?.width ?? 0);
+  if (handle.includes("n")) y1 = fit(p.y, bounds?.height ?? 0);
+  if (handle.includes("s")) y2 = fit(p.y, bounds?.height ?? 0);
   if (x1 === x2 || y1 === y2) return null;
   return {
     rect: { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) },
@@ -296,17 +317,8 @@ function resizeKeepingRatio(
 /** Tracks whether Option/Alt is held, for the zoom-out cursor. */
 function useAltKey() {
   const [down, setDown] = useState(false);
-  useEffect(() => {
-    const update = (e: KeyboardEvent) => setDown(e.altKey);
-    const reset = () => setDown(false);
-    window.addEventListener("keydown", update);
-    window.addEventListener("keyup", update);
-    window.addEventListener("blur", reset);
-    return () => {
-      window.removeEventListener("keydown", update);
-      window.removeEventListener("keyup", update);
-      window.removeEventListener("blur", reset);
-    };
-  }, []);
+  useWindowEvent("keydown", (e) => setDown(e.altKey));
+  useWindowEvent("keyup", (e) => setDown(e.altKey));
+  useWindowEvent("blur", () => setDown(false));
   return down;
 }

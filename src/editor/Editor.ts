@@ -1,12 +1,14 @@
 import {
   type Anchor,
   type Rect,
+  canvasToPngBlob,
   clipRect,
   cloneCanvas,
   context2d,
   createCanvas,
   isValidSize,
   resizeCanvasArea,
+  sameRect,
   scaleCanvas,
 } from "./canvas.ts";
 
@@ -35,6 +37,8 @@ export class Editor {
   selection: Rect | null = null;
   /** Pixels lifted off the image by the move tool, not yet merged back. */
   floating: Floating | null = null;
+  /** Bumped only when the rendered pixels change, not for selection-only changes. */
+  pixelVersion = 0;
 
   private undoStack: Snapshot[] = [];
   private redoStack: Snapshot[] = [];
@@ -64,14 +68,20 @@ export class Editor {
     return this.redoStack.length > 0;
   }
 
-  private emit() {
+  private emit(pixelsChanged = true) {
     this.version++;
+    if (pixelsChanged) this.pixelVersion++;
     for (const listener of this.listeners) listener();
   }
 
-  private pushHistory() {
+  /**
+   * Record the current state for undo. Pass `copy: false` when the operation
+   * replaces the image rather than drawing into it, so no copy is needed.
+   */
+  private pushHistory(copy = true) {
     if (!this.image) return;
-    this.undoStack.push({ image: cloneCanvas(this.image), selection: this.selection });
+    const image = copy ? cloneCanvas(this.image) : this.image;
+    this.undoStack.push({ image, selection: this.selection });
     if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
     this.redoStack = [];
   }
@@ -97,19 +107,25 @@ export class Editor {
     this.emit();
   }
 
-  /** Merge floating pixels back into the image. */
-  commitFloating() {
-    if (!this.floating || !this.image) return;
+  /**
+   * Merge floating pixels back into the image, without notifying; callers
+   * emit once for the whole operation. Returns whether anything was merged.
+   */
+  private mergeFloating() {
+    if (!this.floating || !this.image) return false;
     context2d(this.image).drawImage(this.floating.canvas, this.floating.x, this.floating.y);
     this.floating = null;
     this.selection = this.selection && clipRect(this.selection, this.width, this.height);
-    this.emit();
+    return true;
   }
 
   setSelection(rect: Rect | null) {
-    this.commitFloating();
-    this.selection = rect && clipRect(rect, this.width, this.height);
-    this.emit();
+    const next = rect && clipRect(rect, this.width, this.height);
+    if (!this.floating && sameRect(next, this.selection)) return;
+    // Merging draws the same picture, so the pixels on screen don't change.
+    this.mergeFloating();
+    this.selection = next;
+    this.emit(false);
   }
 
   selectAll() {
@@ -123,7 +139,7 @@ export class Editor {
 
   fill(color: string) {
     if (!this.image) return;
-    this.commitFloating();
+    this.mergeFloating();
     this.pushHistory();
     const { x, y, w, h } = this.targetRect();
     const ctx = context2d(this.image);
@@ -133,8 +149,9 @@ export class Editor {
   }
 
   deleteSelection() {
-    if (!this.image || !this.selection) return;
-    this.commitFloating();
+    if (!this.image) return;
+    this.mergeFloating();
+    // Checked after merging, which can clip the selection away.
     if (!this.selection) return;
     this.pushHistory();
     const { x, y, w, h } = this.selection;
@@ -161,6 +178,7 @@ export class Editor {
 
   moveFloatingTo(x: number, y: number) {
     if (!this.floating || !this.selection) return;
+    if (this.floating.x === x && this.floating.y === y) return;
     this.floating.x = x;
     this.floating.y = y;
     this.selection = { ...this.selection, x, y };
@@ -174,6 +192,7 @@ export class Editor {
   transformFloating(rect: Rect, flipX: boolean, flipY: boolean) {
     const f = this.floating;
     if (!f || !isValidSize(rect.w) || !isValidSize(rect.h)) return;
+    if (sameRect(rect, this.selection) && flipX === f.flipX && flipY === f.flipY) return;
     const canvas = createCanvas(rect.w, rect.h);
     const ctx = context2d(canvas);
     ctx.imageSmoothingQuality = "high";
@@ -208,7 +227,7 @@ export class Editor {
    */
   paste(pasted: HTMLCanvasElement) {
     if (!this.image) return;
-    this.commitFloating();
+    this.mergeFloating();
     this.pushHistory();
     const { x, y, w, h } = this.targetRect();
     const px = Math.round(x + (w - pasted.width) / 2);
@@ -219,47 +238,47 @@ export class Editor {
   }
 
   resizeImage(width: number, height: number) {
-    if (!this.image) return;
-    this.commitFloating();
-    this.pushHistory();
-    this.image = scaleCanvas(this.image, width, height);
-    this.selection = null;
-    this.emit();
+    this.replaceImage((image) => scaleCanvas(image, width, height));
   }
 
   resizeCanvas(width: number, height: number, anchor: Anchor, background: string | null) {
+    this.replaceImage((image) => resizeCanvasArea(image, width, height, anchor, background));
+  }
+
+  /** Swap in a new image made from the current one, and drop the selection. */
+  private replaceImage(make: (image: HTMLCanvasElement) => HTMLCanvasElement) {
     if (!this.image) return;
-    this.commitFloating();
-    this.pushHistory();
-    this.image = resizeCanvasArea(this.image, width, height, anchor, background);
+    this.mergeFloating();
+    // `make` leaves the current image untouched, so history can keep it as is.
+    this.pushHistory(false);
+    this.image = make(this.image);
     this.selection = null;
     this.emit();
   }
 
   undo() {
     // Merge first so redo can bring the move back; the snapshot predates the lift.
-    this.commitFloating();
-    const snapshot = this.undoStack.pop();
-    if (!snapshot || !this.image) return;
-    this.redoStack.push({ image: this.image, selection: this.selection });
-    this.image = snapshot.image;
-    this.selection = snapshot.selection;
-    this.emit();
+    this.mergeFloating();
+    this.restore(this.undoStack, this.redoStack);
   }
 
   redo() {
-    const snapshot = this.redoStack.pop();
+    this.restore(this.redoStack, this.undoStack);
+  }
+
+  /** Restore the latest snapshot in `from`, saving the current state to `to`. */
+  private restore(from: Snapshot[], to: Snapshot[]) {
+    const snapshot = from.pop();
     if (!snapshot || !this.image) return;
-    this.undoStack.push({ image: this.image, selection: this.selection });
+    to.push({ image: this.image, selection: this.selection });
     this.image = snapshot.image;
     this.selection = snapshot.selection;
     this.emit();
   }
 
-  exportPng(): Promise<Blob | null> {
-    this.commitFloating();
-    const image = this.image;
-    if (!image) return Promise.resolve(null);
-    return new Promise((resolve) => image.toBlob(resolve, "image/png"));
+  /** The image as PNG, with any floating pixels merged in. */
+  async exportPng(): Promise<Blob | null> {
+    if (this.mergeFloating()) this.emit();
+    return this.image && canvasToPngBlob(this.image);
   }
 }

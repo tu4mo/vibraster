@@ -16,7 +16,13 @@ import {
   Title,
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
-import { useFileDialog, useHotkeys } from "@mantine/hooks";
+import {
+  type SetFloatingWindowPosition,
+  clamp,
+  useFileDialog,
+  useHotkeys,
+  useWindowEvent,
+} from "@mantine/hooks";
 import {
   IconArrowBackUp,
   IconArrowForwardUp,
@@ -38,15 +44,23 @@ import {
   IconZoomIn,
   IconZoomScan,
 } from "@tabler/icons-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, lazy, useRef, useState } from "react";
 import { CanvasView, type Tool } from "./components/CanvasView.tsx";
 import { ColorControls } from "./components/ColorControls.tsx";
-import { NewImageDialog } from "./components/NewImageDialog.tsx";
-import { ResizeCanvasDialog } from "./components/ResizeCanvasDialog.tsx";
-import { ResizeImageDialog } from "./components/ResizeImageDialog.tsx";
 import { Tip } from "./components/Tip.tsx";
-import { createBlankImage, loadImageFile } from "./editor/canvas.ts";
+import { canvasToPngBlob, createBlankImage, loadImageFile } from "./editor/canvas.ts";
 import { useEditor } from "./editor/useEditor.ts";
+
+// Dialogs load on first use, which keeps their inputs out of the startup bundle.
+const NewImageDialog = lazy(() =>
+  import("./components/NewImageDialog.tsx").then((m) => ({ default: m.NewImageDialog })),
+);
+const ResizeCanvasDialog = lazy(() =>
+  import("./components/ResizeCanvasDialog.tsx").then((m) => ({ default: m.ResizeCanvasDialog })),
+);
+const ResizeImageDialog = lazy(() =>
+  import("./components/ResizeImageDialog.tsx").then((m) => ({ default: m.ResizeImageDialog })),
+);
 
 const ZOOM_STEPS = [0.05, 0.1, 0.25, 1 / 3, 0.5, 2 / 3, 1, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32];
 const ACCEPT = "image/png,image/jpeg,image/webp,image/gif,image/bmp";
@@ -81,49 +95,48 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const palette = useRef<HTMLDivElement>(null);
+  const setPalettePosition = useRef<SetFloatingWindowPosition>(null);
 
   // FloatingWindow only keeps the palette inside the browser window; also keep
   // it off the header and status bar. This runs in the same drag step that
-  // moved it, before paint, so the correction never shows.
-  const keepPaletteBelowHeader = useCallback(({ y }: { y: number }) => {
+  // moved it, before paint, so the correction never shows. Setting the
+  // position calls back here once more, with nothing left to correct.
+  const keepPaletteBelowHeader = ({ y }: { y: number }) => {
     const el = palette.current;
     if (!el) return;
     const min = HEADER_HEIGHT + PALETTE_MARGIN;
     const max = window.innerHeight - FOOTER_HEIGHT - PALETTE_MARGIN - el.offsetHeight;
-    const clamped = Math.min(Math.max(y, min), max);
-    if (clamped !== y) el.style.top = `${clamped}px`;
-  }, []);
+    const clamped = clamp(y, min, max);
+    if (clamped !== y) setPalettePosition.current?.({ top: clamped });
+  };
 
   const hasImage = editor.image !== null;
   const hasSelection = editor.selection !== null;
 
-  const fitZoom = useCallback(
-    (width = editor.width, height = editor.height) => {
-      const el = viewport.current;
-      if (!el || !width || !height) return 1;
-      const pad = 64;
-      return Math.min(1, (el.clientWidth - pad) / width, (el.clientHeight - pad) / height);
-    },
-    [editor],
-  );
+  /** Zoom that fits an image of this size (default: the open one) in the viewport. */
+  const fitZoom = (width?: number, height?: number) => {
+    const w = width ?? editor.width;
+    const h = height ?? editor.height;
+    const el = viewport.current;
+    if (!el || !w || !h) return 1;
+    const pad = 64;
+    return Math.min(1, (el.clientWidth - pad) / w, (el.clientHeight - pad) / h);
+  };
 
-  const openFile = useCallback(
-    async (file: File) => {
-      if (!file.type.startsWith("image/")) {
-        setError(`"${file.name}" is not an image.`);
-        return;
-      }
-      try {
-        const image = await loadImageFile(file);
-        editor.load(image, file.name);
-        setZoom(fitZoom(image.width, image.height));
-        setError(null);
-      } catch {
-        setError(`Could not read "${file.name}".`);
-      }
-    },
-    [editor, fitZoom],
-  );
+  const openFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setError(`"${file.name}" is not an image.`);
+      return;
+    }
+    try {
+      const image = await loadImageFile(file);
+      editor.load(image, file.name);
+      setZoom(fitZoom(image.width, image.height));
+      setError(null);
+    } catch {
+      setError(`Could not read "${file.name}".`);
+    }
+  };
 
   const fileDialog = useFileDialog({
     accept: ACCEPT,
@@ -132,8 +145,14 @@ export default function App() {
     onChange: (files) => files?.[0] && void openFile(files[0]),
   });
 
-  const save = useCallback(async () => {
-    const blob = await editor.exportPng();
+  const save = async () => {
+    let blob;
+    try {
+      blob = await editor.exportPng();
+    } catch {
+      setError("Could not save the image.");
+      return;
+    }
     if (!blob) return;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -141,39 +160,15 @@ export default function App() {
     a.download = `${editor.fileName}.png`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [editor]);
+  };
 
-  const zoomBy = useCallback((direction: 1 | -1) => {
+  const zoomBy = (direction: 1 | -1) => {
     setZoom((z) =>
       direction > 0
         ? (ZOOM_STEPS.find((s) => s > z + 1e-6) ?? z)
         : (ZOOM_STEPS.findLast((s) => s < z - 1e-6) ?? z),
     );
-  }, []);
-
-  /** Image point to keep under the cursor after a zoom tool click. */
-  const zoomAnchor = useRef<{ imageX: number; imageY: number; clientX: number; clientY: number }>(
-    null,
-  );
-
-  const zoomAt = useCallback(
-    (direction: 1 | -1, imageX: number, imageY: number, clientX: number, clientY: number) => {
-      zoomAnchor.current = { imageX, imageY, clientX, clientY };
-      zoomBy(direction);
-    },
-    [zoomBy],
-  );
-
-  // After a zoom tool click, scroll so the clicked point stays under the cursor.
-  useLayoutEffect(() => {
-    const anchor = zoomAnchor.current;
-    const stage = viewport.current?.querySelector(".stage");
-    zoomAnchor.current = null;
-    if (!anchor || !stage || !viewport.current) return;
-    const rect = stage.getBoundingClientRect();
-    viewport.current.scrollLeft += rect.left + anchor.imageX * zoom - anchor.clientX;
-    viewport.current.scrollTop += rect.top + anchor.imageY * zoom - anchor.clientY;
-  }, [zoom]);
+  };
 
   const swapColors = () => {
     setForeground(background);
@@ -223,43 +218,35 @@ export default function App() {
   ]);
 
   /** Paste onto the open image as movable pixels, or open it if there is none. */
-  const pasteImage = useCallback(
-    async (blob: Blob) => {
-      if (!editor.image) {
-        await openFile(new File([blob], "Pasted image.png", { type: blob.type }));
-        return;
-      }
-      try {
-        editor.paste(await loadImageFile(blob));
-        setTool("move");
-        setError(null);
-      } catch {
-        setError("Could not read the pasted image.");
-      }
-    },
-    [editor, openFile],
-  );
+  const pasteImage = async (blob: Blob) => {
+    if (!editor.image) {
+      await openFile(new File([blob], "Pasted image.png", { type: blob.type }));
+      return;
+    }
+    try {
+      editor.paste(await loadImageFile(blob));
+      setTool("move");
+      setError(null);
+    } catch {
+      setError("Could not read the pasted image.");
+    }
+  };
 
   /** Copy the selection (or whole image) to the system clipboard as PNG. */
-  const copy = useCallback(async () => {
+  const copy = async () => {
     const canvas = editor.copySelection();
     if (!canvas) return;
-    // Hand ClipboardItem a promise so the write starts within the user gesture.
-    const png = new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob(
-        (b) => (b ? resolve(b) : reject(new Error("PNG encoding failed"))),
-        "image/png",
-      ),
-    );
     try {
+      // Hand ClipboardItem a promise so the write starts within the user gesture.
+      const png = canvasToPngBlob(canvas);
       await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
     } catch {
       setError("Could not copy to the clipboard.");
     }
-  }, [editor]);
+  };
 
   /** Edit → Paste: read the clipboard directly (the browser may ask for permission). */
-  const pasteFromClipboard = useCallback(async () => {
+  const pasteFromClipboard = async () => {
     try {
       for (const item of await navigator.clipboard.read()) {
         const type = item.types.find((t) => t.startsWith("image/"));
@@ -269,19 +256,15 @@ export default function App() {
     } catch {
       setError("Could not read the clipboard. Try ⌘V instead.");
     }
-  }, [pasteImage]);
+  };
 
   // ⌘V arrives as a paste event, which needs no clipboard permission.
-  useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => {
-      const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
-      if (!file) return;
-      e.preventDefault();
-      void pasteImage(file);
-    };
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [pasteImage]);
+  useWindowEvent("paste", (e) => {
+    const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+    if (!file) return;
+    e.preventDefault();
+    void pasteImage(file);
+  });
 
   return (
     <AppShell header={{ height: HEADER_HEIGHT }} footer={{ height: FOOTER_HEIGHT }} padding={0}>
@@ -408,7 +391,7 @@ export default function App() {
                 w={72}
                 onClick={() => setZoom(1)}
                 disabled={!hasImage}
-                className="zoom-level"
+                className="tabular"
               >
                 {Math.round(zoom * 100)}%
               </Button>
@@ -446,10 +429,11 @@ export default function App() {
         radius="md"
         p={8}
         ref={palette}
-        initialPosition={{ top: HEADER_HEIGHT + 8, left: 0 }}
+        initialPosition={{ top: HEADER_HEIGHT + PALETTE_MARGIN, left: 0 }}
         constrainToViewport
         constrainOffset={PALETTE_MARGIN}
         onPositionChange={keepPaletteBelowHeader}
+        setPositionRef={setPalettePosition}
         dragHandleSelector=".palette-grip"
         // Above the app shell (100) but below modals (200) and popovers/tooltips (300).
         zIndex={150}
@@ -490,24 +474,18 @@ export default function App() {
       </FloatingWindow>
 
       <AppShell.Main>
-        <div
-          ref={viewport}
-          className="viewport"
-          onPointerDown={(e) => {
-            // A click on the empty area around the image (not on the image) deselects.
-            if (e.target === e.currentTarget && e.button === 0) editor.setSelection(null);
-          }}
-        >
-          {hasImage ? (
-            <CanvasView
-              editor={editor}
-              version={version}
-              tool={tool}
-              zoom={zoom}
-              background={background}
-              onZoomAt={zoomAt}
-            />
-          ) : (
+        {hasImage ? (
+          <CanvasView
+            ref={viewport}
+            editor={editor}
+            version={version}
+            tool={tool}
+            zoom={zoom}
+            background={background}
+            onZoom={zoomBy}
+          />
+        ) : (
+          <div ref={viewport} className="viewport">
             <Center flex={1}>
               <EmptyState
                 icon={<IconPhoto size={32} stroke={1.5} />}
@@ -529,8 +507,8 @@ export default function App() {
                 </Group>
               </EmptyState>
             </Center>
-          )}
-        </div>
+          </div>
+        )}
         {/* Mantine positions this itself, fixed above the status bar. */}
         <ActionBar opened={hasSelection} onClose={() => editor.setSelection(null)} shadow="md">
           <Text size="sm" c="dimmed" className="tabular">
@@ -597,34 +575,36 @@ export default function App() {
         </Center>
       </Dropzone.FullScreen>
 
-      {dialog === "image" && (
-        <ResizeImageDialog
-          width={editor.width}
-          height={editor.height}
-          onApply={(w, h) => editor.resizeImage(w, h)}
-          onClose={() => setDialog(null)}
-        />
-      )}
-      {dialog === "new" && (
-        <NewImageDialog
-          background={background}
-          onCreate={(w, h, fill) => {
-            editor.load(createBlankImage(w, h, fill), "Untitled");
-            setZoom(fitZoom(w, h));
-            setError(null);
-          }}
-          onClose={() => setDialog(null)}
-        />
-      )}
-      {dialog === "canvas" && (
-        <ResizeCanvasDialog
-          width={editor.width}
-          height={editor.height}
-          background={background}
-          onApply={(w, h, anchor, bg) => editor.resizeCanvas(w, h, anchor, bg)}
-          onClose={() => setDialog(null)}
-        />
-      )}
+      <Suspense>
+        {dialog === "image" && (
+          <ResizeImageDialog
+            width={editor.width}
+            height={editor.height}
+            onApply={(w, h) => editor.resizeImage(w, h)}
+            onClose={() => setDialog(null)}
+          />
+        )}
+        {dialog === "new" && (
+          <NewImageDialog
+            background={background}
+            onCreate={(w, h, fill) => {
+              editor.load(createBlankImage(w, h, fill), "Untitled");
+              setZoom(fitZoom(w, h));
+              setError(null);
+            }}
+            onClose={() => setDialog(null)}
+          />
+        )}
+        {dialog === "canvas" && (
+          <ResizeCanvasDialog
+            width={editor.width}
+            height={editor.height}
+            background={background}
+            onApply={(w, h, anchor, bg) => editor.resizeCanvas(w, h, anchor, bg)}
+            onClose={() => setDialog(null)}
+          />
+        )}
+      </Suspense>
     </AppShell>
   );
 }

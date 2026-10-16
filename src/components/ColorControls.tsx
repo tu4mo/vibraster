@@ -8,7 +8,6 @@ import {
   Stack,
   Text,
   TextInput,
-  Tooltip,
 } from "@mantine/core";
 import { useEyeDropper } from "@mantine/hooks";
 import { IconArrowsExchange, IconColorPicker } from "@tabler/icons-react";
@@ -102,8 +101,7 @@ function ColorButton({ label, color, onChange }: ColorButtonProps) {
       onClose={() => setDraft(null)}
     >
       <Popover.Target>
-        {/* Mantine's Tooltip (unlike Tip) forwards the target's ref and click handler. */}
-        <Tooltip label={label} position="right" openDelay={300} disabled={opened}>
+        <Tip label={label} position="right" disabled={opened}>
           <ColorSwatch
             component="button"
             type="button"
@@ -115,7 +113,7 @@ function ColorButton({ label, color, onChange }: ColorButtonProps) {
             withShadow={false}
             className="color-swatch"
           />
-        </Tooltip>
+        </Tip>
       </Popover.Target>
       <Popover.Dropdown>
         <Stack gap="xs">

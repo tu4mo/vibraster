@@ -16,7 +16,7 @@ export function createCanvas(width: number, height: number): HTMLCanvasElement {
 }
 
 export function context2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  const ctx = canvas.getContext("2d", { willReadFrequently: false });
+  const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("2D canvas context unavailable");
   return ctx;
 }
@@ -48,6 +48,18 @@ export async function loadImageFile(file: Blob): Promise<HTMLCanvasElement> {
   context2d(canvas).drawImage(bitmap, 0, 0);
   bitmap.close();
   return canvas;
+}
+
+export function sameRect(a: Rect | null, b: Rect | null): boolean {
+  if (!a || !b) return a === b;
+  return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+}
+
+/** Encode a canvas as PNG. */
+export function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG encoding failed"))), "image/png"),
+  );
 }
 
 /** Intersect a rect with the image bounds. Returns null when nothing remains. */

@@ -30,5 +30,7 @@ export default defineConfig({
       },
     ],
   },
-  plugins: lazyPlugins(() => [react()]),
+  // React Compiler via the experimental Rust port (oxc-transform-react). The
+  // build logs any component it has to skip.
+  plugins: lazyPlugins(() => [react({ compiler: { logDiagnostics: true } })]),
 });

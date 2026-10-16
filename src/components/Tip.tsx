@@ -1,15 +1,15 @@
-import { type FloatingPosition, Group, Kbd, Tooltip } from "@mantine/core";
-import type { ReactElement } from "react";
+import { Group, Kbd, Tooltip, type TooltipProps } from "@mantine/core";
 
-type Props = {
+type Props = Omit<TooltipProps, "label"> & {
   label: string;
   shortcut?: string;
-  position?: FloatingPosition;
-  children: ReactElement;
 };
 
-/** Tooltip with an optional keyboard shortcut hint. */
-export function Tip({ label, shortcut, position = "bottom", children }: Props) {
+/**
+ * Tooltip with an optional keyboard shortcut hint. Other props, including the
+ * ref and handlers a Popover or Menu target injects, pass through to Tooltip.
+ */
+export function Tip({ label, shortcut, position = "bottom", ...rest }: Props) {
   return (
     <Tooltip
       position={position}
@@ -20,8 +20,7 @@ export function Tip({ label, shortcut, position = "bottom", children }: Props) {
           {shortcut && <Kbd size="xs">{shortcut}</Kbd>}
         </Group>
       }
-    >
-      {children}
-    </Tooltip>
+      {...rest}
+    />
   );
 }

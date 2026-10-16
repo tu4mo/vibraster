@@ -21,9 +21,11 @@
   overflow: auto;
   padding: 32px;
   background: var(--viewport-bg);
+  user-select: none;
 
-  /* The select tool can start a selection around the image too. */
-  &:has(> .stage[data-tool="select"]) {
+  /* The whole viewport takes presses; the select tool can start a selection
+     around the image too. */
+  &[data-tool="select"] {
     cursor: crosshair;
   }
 }
@@ -41,19 +43,19 @@
   );
   background-size: 16px 16px;
   box-shadow: var(--mantine-shadow-md);
+  /* Touch drags on the image edit it; elsewhere they still scroll. */
   touch-action: none;
-  user-select: none;
   cursor: crosshair;
 
-  &[data-tool="move"] {
+  [data-tool="move"] > & {
     cursor: move;
   }
 
-  &[data-tool="zoom"] {
+  [data-tool="zoom"] > & {
     cursor: zoom-in;
   }
 
-  &[data-zoom-out] {
+  [data-zoom-out] > & {
     cursor: zoom-out;
   }
 
@@ -82,7 +84,7 @@
 
 .selection {
   position: absolute;
-  /* Events bubble to the stage; this only sets the cursor. */
+  /* Events bubble to the viewport; this only sets the cursor. */
   cursor: move;
   /* Marching ants: black/white dashes on each edge. */
   background:
@@ -92,7 +94,7 @@
     linear-gradient(0deg, #000 50%, #fff 0) 100% 0 / 1px 8px repeat-y;
   animation: ants 0.6s linear infinite;
 
-  [data-tool="zoom"] > & {
+  [data-tool="zoom"] & {
     cursor: inherit;
   }
 }
@@ -105,44 +107,33 @@
   background: #fff;
   border: 1px solid #000;
 
-  &[data-handle="nw"] {
+  /* Placed by the compass letters in its name; sides sit midway. */
+  left: 50%;
+  top: 50%;
+
+  &[data-handle*="w"] {
     left: 0;
+  }
+  &[data-handle*="e"] {
+    left: 100%;
+  }
+  &[data-handle*="n"] {
     top: 0;
+  }
+  &[data-handle*="s"] {
+    top: 100%;
+  }
+
+  &:is([data-handle="nw"], [data-handle="se"]) {
     cursor: nwse-resize;
   }
-  &[data-handle="n"] {
-    left: 50%;
-    top: 0;
-    cursor: ns-resize;
-  }
-  &[data-handle="ne"] {
-    left: 100%;
-    top: 0;
+  &:is([data-handle="ne"], [data-handle="sw"]) {
     cursor: nesw-resize;
   }
-  &[data-handle="e"] {
-    left: 100%;
-    top: 50%;
-    cursor: ew-resize;
-  }
-  &[data-handle="se"] {
-    left: 100%;
-    top: 100%;
-    cursor: nwse-resize;
-  }
-  &[data-handle="s"] {
-    left: 50%;
-    top: 100%;
+  &:is([data-handle="n"], [data-handle="s"]) {
     cursor: ns-resize;
   }
-  &[data-handle="sw"] {
-    left: 0;
-    top: 100%;
-    cursor: nesw-resize;
-  }
-  &[data-handle="w"] {
-    left: 0;
-    top: 50%;
+  &:is([data-handle="e"], [data-handle="w"]) {
     cursor: ew-resize;
   }
 }
@@ -192,8 +183,7 @@
   }
 }
 
-.tabular,
-.zoom-level {
+.tabular {
   font-variant-numeric: tabular-nums;
 }
 
