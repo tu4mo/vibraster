@@ -186,7 +186,12 @@ export default function App() {
     ["mod+A", () => editing && editor.selectAll()],
     ["mod+D", () => editing && editor.setSelection(null)],
     ["mod+S", () => editing && void save()],
+    // Zoom in is ⌘= on US keyboards, ⌘+ (Shift+=) there too, and ⌘+ without
+    // Shift on layouts with a dedicated + key. Handle them all so the browser
+    // never zooms the page instead.
     ["mod+=", () => editing && zoomBy(1)],
+    ["mod+[plus]", () => editing && zoomBy(1)],
+    ["mod+shift+[plus]", () => editing && zoomBy(1)],
     ["mod+-", () => editing && zoomBy(-1)],
     ["mod+0", () => editing && setZoom(fitZoom())],
     ["Delete", () => editing && editor.deleteSelection()],
@@ -312,7 +317,7 @@ export default function App() {
                 variant="subtle"
                 color="gray"
                 size="compact-sm"
-                w={60}
+                w={72}
                 onClick={() => setZoom(1)}
                 disabled={!hasImage}
                 className="zoom-level"
@@ -353,7 +358,7 @@ export default function App() {
         radius="md"
         p={8}
         ref={palette}
-        initialPosition={{ top: HEADER_HEIGHT + 16, left: 16 }}
+        initialPosition={{ top: HEADER_HEIGHT + 8, left: 0 }}
         constrainToViewport
         constrainOffset={PALETTE_MARGIN}
         onPositionChange={keepPaletteBelowHeader}

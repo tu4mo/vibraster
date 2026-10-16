@@ -6,6 +6,9 @@ export type Tool = "select" | "move" | "zoom";
 
 /** Selection resize handles: corners and sides, named by compass direction. */
 const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+
+/** Zoom at which the pixel grid appears (each image pixel is this many screen pixels). */
+const PIXEL_GRID_MIN_ZOOM = 6;
 type Handle = (typeof HANDLES)[number];
 
 type Drag =
@@ -156,6 +159,9 @@ export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }
       onPointerDown={onPointerDown}
     >
       <canvas ref={canvasRef} className={zoom > 1 ? "pixelated" : undefined} />
+      {zoom >= PIXEL_GRID_MIN_ZOOM && (
+        <div className="pixel-grid" style={{ "--cell": `${zoom}px` } as React.CSSProperties} />
+      )}
       {sel && (
         <div
           className="selection"
