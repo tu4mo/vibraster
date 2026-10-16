@@ -1,60 +1,18 @@
-import {
-  ActionBar,
-  ActionIcon,
-  AppShell,
-  Button,
-  Center,
-  ColorSwatch,
-  Divider,
-  FloatingWindow,
-  EmptyState,
-  Group,
-  Menu,
-  Menubar,
-  Stack,
-  Text,
-  Title,
-} from "@mantine/core";
+import { AppShell, Center, Group, Text, Title } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
-import {
-  type SetFloatingWindowPosition,
-  clamp,
-  useFileDialog,
-  useElementSize,
-  useHotkeys,
-  useWindowEvent,
-} from "@mantine/hooks";
-import {
-  IconArrowBackUp,
-  IconArrowForwardUp,
-  IconArrowsMove,
-  IconDeviceFloppy,
-  IconEraser,
-  IconClipboard,
-  IconCopy,
-  IconFilePlus,
-  IconFolderOpen,
-  IconFrame,
-  IconGripHorizontal,
-  IconMarquee2,
-  IconMinus,
-  IconPhoto,
-  IconPlus,
-  IconResize,
-  IconSelectAll,
-  IconX,
-  IconZoomIn,
-  IconZoomScan,
-} from "@tabler/icons-react";
-import { Suspense, lazy, useLayoutEffect, useRef, useState } from "react";
+import { useElementSize, useFileDialog, useHotkeys, useWindowEvent } from "@mantine/hooks";
+import { Suspense, lazy, useRef, useState } from "react";
 import { CanvasView, type Tool } from "./components/CanvasView.tsx";
-import { ColorControls } from "./components/ColorControls.tsx";
 import { DocumentTabs } from "./components/DocumentTabs.tsx";
-import { Tip } from "./components/Tip.tsx";
+import { MainMenu } from "./components/MainMenu.tsx";
+import { SelectionBar } from "./components/SelectionBar.tsx";
+import { StartScreen } from "./components/StartScreen.tsx";
+import { StatusBar } from "./components/StatusBar.tsx";
+import { ToolPalette } from "./components/ToolPalette.tsx";
+import { ZoomControls } from "./components/ZoomControls.tsx";
 import { canvasToPngBlob, createBlankImage, loadImageFile } from "./editor/canvas.ts";
 import { Editor } from "./editor/Editor.ts";
 import { useDocuments } from "./editor/useDocuments.ts";
-import { useEditorVersion } from "./editor/useEditorVersion.ts";
 
 // Dialogs load on first use, which keeps their inputs out of the startup bundle.
 const NewImageDialog = lazy(() =>
@@ -71,45 +29,12 @@ const ZOOM_STEPS = [0.05, 0.1, 0.25, 1 / 3, 0.5, 2 / 3, 1, 1.5, 2, 3, 4, 6, 8, 1
 const ACCEPT = "image/png,image/jpeg,image/webp,image/gif,image/bmp";
 const HEADER_HEIGHT = 52;
 const FOOTER_HEIGHT = 28;
-/** Gap kept between the tool palette and the window, header and status bar. */
-const PALETTE_MARGIN = 8;
-const ICON = { size: 18, stroke: 1.75 };
-const MENU_ICON = { size: 16, stroke: 1.75 };
-
-function Shortcut({ keys }: { keys: string }) {
-  return (
-    <Text size="xs" c="dimmed">
-      {keys}
-    </Text>
-  );
-}
-
 /** Stands in for the active editor while no image is open; never loaded. */
 const NO_IMAGE = new Editor();
-
-const TOOLS: { value: Tool; label: string; shortcut: string; icon: typeof IconMarquee2 }[] = [
-  { value: "select", label: "Rectangle select", shortcut: "M", icon: IconMarquee2 },
-  { value: "move", label: "Move selection", shortcut: "V", icon: IconArrowsMove },
-  { value: "zoom", label: "Zoom (⌥-click to zoom out)", shortcut: "Z", icon: IconZoomIn },
-];
-
-/** Move the palette `el`, whose top is at `y`, back between `minTop` and the status bar. */
-function keepPaletteInBounds(
-  el: HTMLElement,
-  y: number,
-  minTop: number,
-  setPosition: SetFloatingWindowPosition | null,
-) {
-  const max = window.innerHeight - FOOTER_HEIGHT - PALETTE_MARGIN - el.offsetHeight;
-  const clamped = clamp(y, minTop, max);
-  if (clamped !== y) setPosition?.({ top: clamped });
-}
 
 export default function App() {
   const documents = useDocuments();
   const editor = documents.active?.editor ?? NO_IMAGE;
-  // Re-render on the active image's changes (menus, status bar).
-  useEditorVersion(editor);
   const zoom = documents.active?.zoom ?? 1;
   const setZoom = documents.setZoom;
   const [tool, setTool] = useState<Tool>("select");
@@ -118,37 +43,9 @@ export default function App() {
   const [dialog, setDialog] = useState<"new" | "image" | "canvas" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
-  const palette = useRef<HTMLDivElement>(null);
-  const setPalettePosition = useRef<SetFloatingWindowPosition>(null);
   const { ref: tabListRef, height: tabListHeight } = useElementSize();
 
   const hasImage = documents.active !== null;
-  const hasSelection = editor.selection !== null;
-
-  // FloatingWindow only keeps the palette inside the browser window; also keep
-  // it off the header, tabs and status bar. This runs in the same drag step
-  // that moved it, before paint, so the correction never shows. Setting the
-  // position calls back here once more, with nothing left to correct.
-  const paletteMinTop = HEADER_HEIGHT + tabListHeight + PALETTE_MARGIN;
-  const keepPaletteBelowHeader = ({ y }: { y: number }) => {
-    if (palette.current) {
-      keepPaletteInBounds(palette.current, y, paletteMinTop, setPalettePosition.current);
-    }
-  };
-
-  // The palette opens before the tab strip is measured; once it is, push the
-  // palette down off it.
-  useLayoutEffect(() => {
-    const el = palette.current;
-    if (el) {
-      keepPaletteInBounds(
-        el,
-        el.getBoundingClientRect().top,
-        paletteMinTop,
-        setPalettePosition.current,
-      );
-    }
-  }, [paletteMinTop]);
 
   /** Zoom that fits an image of this size (default: the open one) in the viewport. */
   const fitZoom = (width?: number, height?: number) => {
@@ -312,212 +209,40 @@ export default function App() {
             Vibraster
           </Title>
 
-          <Menubar>
-            <Menubar.Menu>
-              <Menubar.Target>File</Menubar.Target>
-              <Menubar.Dropdown>
-                {/* No ⌘N: Chrome reserves it for a new window and pages can't override it. */}
-                <Menu.Item
-                  leftSection={<IconFilePlus {...MENU_ICON} />}
-                  onClick={() => setDialog("new")}
-                >
-                  New…
-                </Menu.Item>
-                <Menu.Item
-                  leftSection={<IconFolderOpen {...MENU_ICON} />}
-                  rightSection={<Shortcut keys="⌘O" />}
-                  onClick={fileDialog.open}
-                >
-                  Open…
-                </Menu.Item>
-                <Menu.Item
-                  leftSection={<IconDeviceFloppy {...MENU_ICON} />}
-                  rightSection={<Shortcut keys="⌘S" />}
-                  onClick={save}
-                  disabled={!hasImage}
-                >
-                  Save as PNG
-                </Menu.Item>
-                {/* No ⌘W either: browsers close the tab before the page sees it. */}
-                <Menu.Item
-                  leftSection={<IconX {...MENU_ICON} />}
-                  onClick={() => documents.active && documents.close(documents.active.id)}
-                  disabled={!hasImage}
-                >
-                  Close
-                </Menu.Item>
-              </Menubar.Dropdown>
-            </Menubar.Menu>
-
-            <Menubar.Menu>
-              <Menubar.Target>Edit</Menubar.Target>
-              <Menubar.Dropdown>
-                <Menu.Item
-                  leftSection={<IconArrowBackUp {...MENU_ICON} />}
-                  rightSection={<Shortcut keys="⌘Z" />}
-                  onClick={() => editor.undo()}
-                  disabled={!editor.canUndo}
-                >
-                  Undo
-                </Menu.Item>
-                <Menu.Item
-                  leftSection={<IconArrowForwardUp {...MENU_ICON} />}
-                  rightSection={<Shortcut keys="⇧⌘Z" />}
-                  onClick={() => editor.redo()}
-                  disabled={!editor.canRedo}
-                >
-                  Redo
-                </Menu.Item>
-                <Menu.Divider />
-                <Menu.Item
-                  leftSection={<IconCopy {...MENU_ICON} />}
-                  rightSection={<Shortcut keys="⌘C" />}
-                  onClick={copy}
-                  disabled={!hasImage}
-                >
-                  {hasSelection ? "Copy" : "Copy image"}
-                </Menu.Item>
-                <Menu.Item
-                  leftSection={<IconClipboard {...MENU_ICON} />}
-                  rightSection={<Shortcut keys="⌘V" />}
-                  onClick={pasteFromClipboard}
-                >
-                  Paste
-                </Menu.Item>
-                <Menu.Divider />
-                <Menu.Item
-                  leftSection={<IconSelectAll {...MENU_ICON} />}
-                  rightSection={<Shortcut keys="⌘A" />}
-                  onClick={() => editor.selectAll()}
-                  disabled={!hasImage}
-                >
-                  Select all
-                </Menu.Item>
-              </Menubar.Dropdown>
-            </Menubar.Menu>
-
-            <Menubar.Menu>
-              <Menubar.Target>Image</Menubar.Target>
-              <Menubar.Dropdown>
-                <Menu.Item
-                  leftSection={<IconResize {...MENU_ICON} />}
-                  onClick={() => setDialog("image")}
-                  disabled={!hasImage}
-                >
-                  Image size…
-                </Menu.Item>
-                <Menu.Item
-                  leftSection={<IconFrame {...MENU_ICON} />}
-                  onClick={() => setDialog("canvas")}
-                  disabled={!hasImage}
-                >
-                  Canvas size…
-                </Menu.Item>
-              </Menubar.Dropdown>
-            </Menubar.Menu>
-          </Menubar>
-
-          <Group gap={2} wrap="nowrap" ml="auto">
-            <Tip label="Zoom out" shortcut="⌘−">
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                aria-label="Zoom out"
-                onClick={() => zoomBy(-1)}
-                disabled={!hasImage}
-              >
-                <IconMinus size={16} />
-              </ActionIcon>
-            </Tip>
-            <Tip label="Actual size">
-              <Button
-                variant="subtle"
-                color="gray"
-                size="compact-sm"
-                w={72}
-                onClick={() => setZoom(1)}
-                disabled={!hasImage}
-                className="tabular"
-              >
-                {Math.round(zoom * 100)}%
-              </Button>
-            </Tip>
-            <Tip label="Zoom in" shortcut="⌘=">
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                aria-label="Zoom in"
-                onClick={() => zoomBy(1)}
-                disabled={!hasImage}
-              >
-                <IconPlus size={16} />
-              </ActionIcon>
-            </Tip>
-            <Tip label="Fit to window" shortcut="⌘0">
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                aria-label="Fit to window"
-                onClick={() => setZoom(fitZoom())}
-                disabled={!hasImage}
-              >
-                <IconZoomScan size={16} />
-              </ActionIcon>
-            </Tip>
-          </Group>
+          <MainMenu
+            editor={editor}
+            hasImage={hasImage}
+            onNew={() => setDialog("new")}
+            onOpen={fileDialog.open}
+            onSave={save}
+            onClose={() => documents.activeId && documents.close(documents.activeId)}
+            onCopy={copy}
+            onPaste={pasteFromClipboard}
+            onImageSize={() => setDialog("image")}
+            onCanvasSize={() => setDialog("canvas")}
+          />
+          <ZoomControls
+            zoom={zoom}
+            disabled={!hasImage}
+            onZoomBy={zoomBy}
+            onActualSize={() => setZoom(1)}
+            onFit={() => setZoom(fitZoom())}
+          />
         </Group>
       </AppShell.Header>
 
-      {/* Tool palette, shown with an image open: drag it by the grip at the top. */}
       {hasImage && (
-        <FloatingWindow
-          withBorder
-          shadow="md"
-          radius="md"
-          p={8}
-          ref={palette}
-          initialPosition={{ top: paletteMinTop, left: 0 }}
-          constrainToViewport
-          constrainOffset={PALETTE_MARGIN}
-          onPositionChange={keepPaletteBelowHeader}
-          setPositionRef={setPalettePosition}
-          dragHandleSelector=".palette-grip"
-          // Above the app shell (100) but below modals (200) and popovers/tooltips (300).
-          zIndex={150}
-          aria-label="Tools"
-        >
-          <Stack gap={4} align="center">
-            <Center className="palette-grip" w={34} h={12} aria-hidden>
-              <IconGripHorizontal size={14} />
-            </Center>
-            <Stack gap={4} role="radiogroup" aria-label="Tools">
-              {TOOLS.map(({ value, label, shortcut, icon: Icon }) => (
-                <Tip key={value} label={label} shortcut={shortcut} position="right">
-                  <ActionIcon
-                    size="lg"
-                    variant={tool === value ? "filled" : "subtle"}
-                    color={tool === value ? "blue" : "gray"}
-                    role="radio"
-                    aria-checked={tool === value}
-                    aria-label={label}
-                    onClick={() => setTool(value)}
-                  >
-                    <Icon {...ICON} />
-                  </ActionIcon>
-                </Tip>
-              ))}
-            </Stack>
-            {/* One 4px rhythm for everything in the column, divider included. */}
-            <Divider w="100%" />
-            <ColorControls
-              foreground={foreground}
-              background={background}
-              onForegroundChange={setForeground}
-              onBackgroundChange={setBackground}
-              onSwap={swapColors}
-            />
-          </Stack>
-        </FloatingWindow>
+        <ToolPalette
+          tool={tool}
+          onToolChange={setTool}
+          foreground={foreground}
+          background={background}
+          onForegroundChange={setForeground}
+          onBackgroundChange={setBackground}
+          onSwapColors={swapColors}
+          top={HEADER_HEIGHT + tabListHeight}
+          bottom={FOOTER_HEIGHT}
+        />
       )}
 
       {/* Border-box: the full height less the header and footer padding. */}
@@ -543,80 +268,13 @@ export default function App() {
             )}
           </DocumentTabs>
         ) : (
-          <div ref={viewport} className="viewport">
-            <Center flex={1}>
-              <EmptyState
-                icon={<IconPhoto size={32} stroke={1.5} />}
-                withIndicatorBackground
-                title="Open or create an image"
-                description="PNG, JPEG, WebP or GIF. You can also drop a file anywhere or paste one."
-              >
-                <Group mt="md" gap="xs" justify="center">
-                  <Button leftSection={<IconFolderOpen size={16} />} onClick={fileDialog.open}>
-                    Choose file
-                  </Button>
-                  <Button
-                    variant="default"
-                    leftSection={<IconFilePlus size={16} />}
-                    onClick={() => setDialog("new")}
-                  >
-                    New image
-                  </Button>
-                </Group>
-              </EmptyState>
-            </Center>
-          </div>
+          <StartScreen ref={viewport} onOpen={fileDialog.open} onNew={() => setDialog("new")} />
         )}
-        {/* Mantine positions this itself, fixed above the status bar. */}
-        <ActionBar opened={hasSelection} onClose={() => editor.setSelection(null)} shadow="md">
-          <Text size="sm" c="dimmed" className="tabular">
-            {editor.selection?.w} × {editor.selection?.h}
-          </Text>
-          <ActionBar.Divider />
-          <Button
-            variant="subtle"
-            color="gray"
-            size="compact-sm"
-            leftSection={<ColorSwatch color={foreground} size={14} />}
-            onClick={() => editor.fill(foreground)}
-          >
-            Fill
-          </Button>
-          <Button
-            variant="subtle"
-            color="red"
-            size="compact-sm"
-            leftSection={<IconEraser size={16} />}
-            onClick={() => editor.deleteSelection()}
-          >
-            Delete
-          </Button>
-          <ActionBar.Divider />
-          <ActionBar.CloseButton aria-label="Deselect" />
-        </ActionBar>
+        <SelectionBar editor={editor} foreground={foreground} />
       </AppShell.Main>
 
       <AppShell.Footer>
-        <Group h="100%" px="sm" gap="lg" wrap="nowrap" className="statusbar">
-          {error ? (
-            <Text size="xs" c="red">
-              {error}
-            </Text>
-          ) : hasImage ? (
-            <>
-              <Text size="xs" c="dimmed">
-                {editor.fileName}
-              </Text>
-              <Text size="xs" c="dimmed">
-                {editor.width} × {editor.height} px
-              </Text>
-            </>
-          ) : (
-            <Text size="xs" c="dimmed">
-              No image
-            </Text>
-          )}
-        </Group>
+        <StatusBar editor={editor} error={error} />
       </AppShell.Footer>
 
       <Dropzone.FullScreen

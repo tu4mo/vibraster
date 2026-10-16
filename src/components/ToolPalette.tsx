@@ -1,0 +1,134 @@
+import { ActionIcon, Center, Divider, FloatingWindow, Stack } from "@mantine/core";
+import { type SetFloatingWindowPosition, clamp } from "@mantine/hooks";
+import { IconArrowsMove, IconGripHorizontal, IconMarquee2, IconZoomIn } from "@tabler/icons-react";
+import { useLayoutEffect, useRef } from "react";
+import type { Tool } from "./CanvasView.tsx";
+import { ColorControls } from "./ColorControls.tsx";
+import { Tip } from "./Tip.tsx";
+
+/** Gap kept between the palette and the window, header and status bar. */
+const MARGIN = 8;
+const ICON = { size: 18, stroke: 1.75 };
+
+const TOOLS: { value: Tool; label: string; shortcut: string; icon: typeof IconMarquee2 }[] = [
+  { value: "select", label: "Rectangle select", shortcut: "M", icon: IconMarquee2 },
+  { value: "move", label: "Move selection", shortcut: "V", icon: IconArrowsMove },
+  { value: "zoom", label: "Zoom (⌥-click to zoom out)", shortcut: "Z", icon: IconZoomIn },
+];
+
+type Props = {
+  tool: Tool;
+  onToolChange: (tool: Tool) => void;
+  foreground: string;
+  background: string;
+  onForegroundChange: (color: string) => void;
+  onBackgroundChange: (color: string) => void;
+  onSwapColors: () => void;
+  /** Height covered at the top of the window (header and tabs), which the palette stays below. */
+  top: number;
+  /** Height covered at the bottom (status bar), which the palette stays above. */
+  bottom: number;
+};
+
+/**
+ * Move the palette `el`, whose top is at `y`, back below `minTop` and above
+ * the `bottom` covered height if it is outside.
+ */
+function keepInBounds(
+  el: HTMLElement,
+  y: number,
+  minTop: number,
+  bottom: number,
+  setPosition: SetFloatingWindowPosition | null,
+) {
+  const max = window.innerHeight - bottom - MARGIN - el.offsetHeight;
+  const clamped = clamp(y, minTop, max);
+  if (clamped !== y) setPosition?.({ top: clamped });
+}
+
+/** The floating tools and colors; drag it by the grip at the top. */
+export function ToolPalette({
+  tool,
+  onToolChange,
+  foreground,
+  background,
+  onForegroundChange,
+  onBackgroundChange,
+  onSwapColors,
+  top,
+  bottom,
+}: Props) {
+  const palette = useRef<HTMLDivElement>(null);
+  const setPosition = useRef<SetFloatingWindowPosition>(null);
+  const minTop = top + MARGIN;
+
+  // FloatingWindow only keeps the palette inside the browser window; also keep
+  // it off the header, tabs and status bar. This runs in the same drag step
+  // that moved it, before paint, so the correction never shows. Setting the
+  // position calls back here once more, with nothing left to correct.
+  const onPositionChange = ({ y }: { y: number }) => {
+    if (palette.current) {
+      keepInBounds(palette.current, y, minTop, bottom, setPosition.current);
+    }
+  };
+
+  // `top` can grow after the palette opens (the tab strip is measured later);
+  // push the palette down off it.
+  useLayoutEffect(() => {
+    const el = palette.current;
+    if (el) {
+      keepInBounds(el, el.getBoundingClientRect().top, minTop, bottom, setPosition.current);
+    }
+  }, [minTop, bottom]);
+
+  return (
+    <FloatingWindow
+      withBorder
+      shadow="md"
+      radius="md"
+      p={8}
+      ref={palette}
+      initialPosition={{ top: minTop, left: 0 }}
+      constrainToViewport
+      constrainOffset={MARGIN}
+      onPositionChange={onPositionChange}
+      setPositionRef={setPosition}
+      dragHandleSelector=".palette-grip"
+      // Above the app shell (100) but below modals (200) and popovers/tooltips (300).
+      zIndex={150}
+      aria-label="Tools"
+    >
+      <Stack gap={4} align="center">
+        <Center className="palette-grip" w={34} h={12} aria-hidden>
+          <IconGripHorizontal size={14} />
+        </Center>
+        <Stack gap={4} role="radiogroup" aria-label="Tools">
+          {TOOLS.map(({ value, label, shortcut, icon: Icon }) => (
+            <Tip key={value} label={label} shortcut={shortcut} position="right">
+              <ActionIcon
+                size="lg"
+                variant={tool === value ? "filled" : "subtle"}
+                color={tool === value ? "blue" : "gray"}
+                role="radio"
+                aria-checked={tool === value}
+                aria-label={label}
+                onClick={() => onToolChange(value)}
+              >
+                <Icon {...ICON} />
+              </ActionIcon>
+            </Tip>
+          ))}
+        </Stack>
+        {/* One 4px rhythm for everything in the column, divider included. */}
+        <Divider w="100%" />
+        <ColorControls
+          foreground={foreground}
+          background={background}
+          onForegroundChange={onForegroundChange}
+          onBackgroundChange={onBackgroundChange}
+          onSwap={onSwapColors}
+        />
+      </Stack>
+    </FloatingWindow>
+  );
+}
