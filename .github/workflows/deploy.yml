@@ -5,10 +5,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+# Nothing by default; each job asks for only what it needs.
+permissions: {}
 
 # Let an in-progress deployment finish; queue the next one instead of cancelling.
 concurrency:
@@ -18,11 +16,15 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read # configure-pages reads the site's base path
     steps:
       - uses: actions/checkout@v7
 
       # Installs Vite+, Node.js and pnpm, then runs `vp install`.
-      - uses: voidzero-dev/setup-vp@v1.21.2
+      # Third-party action: pinned to a commit so the tag can't be moved under us.
+      - uses: voidzero-dev/setup-vp@68f39c78aaf39be468cabd2afb09c162574c84af # v1.21.2
         with:
           node-version: "24"
           cache: true
@@ -44,6 +46,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
