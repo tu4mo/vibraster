@@ -6,10 +6,10 @@ export type Tool = "select" | "move" | "zoom";
 
 /** Selection resize handles: corners and sides, named by compass direction. */
 const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+type Handle = (typeof HANDLES)[number];
 
 /** Zoom at which the pixel grid appears (each image pixel is this many screen pixels). */
 const PIXEL_GRID_MIN_ZOOM = 6;
-type Handle = (typeof HANDLES)[number];
 
 type Drag =
   | { kind: "select"; startX: number; startY: number }
@@ -18,7 +18,12 @@ type Drag =
   /** Move tool: drag the selected pixels. */
   | { kind: "move"; offsetX: number; offsetY: number }
   /** Select tool: drag a side or corner handle to resize the outline. */
-  | { kind: "resize"; handle: Handle; start: Rect };
+  | { kind: "resize"; handle: Handle; start: Rect }
+  /**
+   * Move tool: drag a handle to scale the pixels. Flips are as at drag start;
+   * `ratio` is the original pixels' aspect ratio, which Shift restores.
+   */
+  | { kind: "scale"; handle: Handle; start: Rect; flipX: boolean; flipY: boolean; ratio: number };
 
 type Props = {
   editor: Editor;
@@ -67,6 +72,12 @@ export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }
     const handle = (e.target as HTMLElement).dataset.handle as Handle | undefined;
     if (tool === "select" && sel && handle) {
       drag.current = { kind: "resize", handle, start: sel };
+    } else if (tool === "move" && sel && handle) {
+      editor.beginMove(background);
+      const f = editor.floating;
+      if (!f) return;
+      const ratio = f.source.width / f.source.height;
+      drag.current = { kind: "scale", handle, start: sel, flipX: f.flipX, flipY: f.flipY, ratio };
     } else if (tool === "select" && sel && insideSelection) {
       drag.current = { kind: "outline", offsetX: p.x - sel.x, offsetY: p.y - sel.y };
     } else if (tool === "select") {
@@ -121,28 +132,17 @@ export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }
       const y = Math.min(editor.height - h, Math.max(0, Math.round(p.y - d.offsetY)));
       editor.setSelection({ x, y, w, h });
     } else if (d.kind === "resize") {
-      // Move only the edges the handle controls; dragging past the opposite edge flips.
-      const { handle, start } = d;
-      if (e.shiftKey) {
-        const rect = resizeKeepingRatio(handle, start, p, editor.width, editor.height);
-        if (rect) editor.setSelection(rect);
-        return;
+      // The outline stays inside the image.
+      const bounds = { width: editor.width, height: editor.height };
+      const ratio = e.shiftKey ? d.start.w / d.start.h : null;
+      const result = resizeRect(d.handle, d.start, p, ratio, bounds);
+      if (result) editor.setSelection(result.rect);
+    } else if (d.kind === "scale") {
+      // Pixels may extend past the image; crossing the opposite edge mirrors them.
+      const result = resizeRect(d.handle, d.start, p, e.shiftKey ? d.ratio : null, null);
+      if (result) {
+        editor.transformFloating(result.rect, d.flipX !== result.flipX, d.flipY !== result.flipY);
       }
-      let x1 = start.x;
-      let y1 = start.y;
-      let x2 = start.x + start.w;
-      let y2 = start.y + start.h;
-      if (handle.includes("w")) x1 = clampX(p.x);
-      if (handle.includes("e")) x2 = clampX(p.x);
-      if (handle.includes("n")) y1 = clampY(p.y);
-      if (handle.includes("s")) y2 = clampY(p.y);
-      if (x1 === x2 || y1 === y2) return;
-      editor.setSelection({
-        x: Math.min(x1, x2),
-        y: Math.min(y1, y2),
-        w: Math.abs(x2 - x1),
-        h: Math.abs(y2 - y1),
-      });
     } else if (d.kind === "move") {
       editor.moveFloatingTo(Math.round(p.x - d.offsetX), Math.round(p.y - d.offsetY));
     }
@@ -172,7 +172,7 @@ export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }
             height: sel.h * zoom,
           }}
         >
-          {tool === "select" &&
+          {(tool === "select" || tool === "move") &&
             HANDLES.map((h) => <div key={h} className="handle" data-handle={h} />)}
         </div>
       )}
@@ -180,19 +180,54 @@ export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }
   );
 }
 
+type Bounds = { width: number; height: number };
+
 /**
- * Resize `start` by dragging `handle` to `p` while keeping its aspect ratio.
+ * Resize `start` by dragging `handle` to `p`, keeping aspect `ratio` (width /
+ * height) when given. Returns the new rect and whether it was dragged past its
+ * opposite edge on each axis (flipped). With `bounds` the result stays inside
+ * them; null when the result would be empty.
+ */
+function resizeRect(
+  handle: Handle,
+  start: Rect,
+  p: { x: number; y: number },
+  ratio: number | null,
+  bounds: Bounds | null,
+): { rect: Rect; flipX: boolean; flipY: boolean } | null {
+  if (ratio) return resizeKeepingRatio(handle, start, p, ratio, bounds);
+
+  const clamp = (v: number, max: number) =>
+    bounds ? Math.min(max, Math.max(0, Math.round(v))) : Math.round(v);
+  // Move only the edges the handle controls.
+  let x1 = start.x;
+  let y1 = start.y;
+  let x2 = start.x + start.w;
+  let y2 = start.y + start.h;
+  if (handle.includes("w")) x1 = clamp(p.x, bounds?.width ?? 0);
+  if (handle.includes("e")) x2 = clamp(p.x, bounds?.width ?? 0);
+  if (handle.includes("n")) y1 = clamp(p.y, bounds?.height ?? 0);
+  if (handle.includes("s")) y2 = clamp(p.y, bounds?.height ?? 0);
+  if (x1 === x2 || y1 === y2) return null;
+  return {
+    rect: { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) },
+    flipX: x2 < x1,
+    flipY: y2 < y1,
+  };
+}
+
+/**
+ * `resizeRect` at a fixed aspect `ratio`, which may differ from `start`'s.
  * Corners pivot on the opposite corner; sides scale the other axis around its
- * center. The result is shrunk to stay inside the image. Null when empty.
+ * center. With `bounds` the result is shrunk to fit inside them.
  */
 function resizeKeepingRatio(
   handle: Handle,
   start: Rect,
   p: { x: number; y: number },
-  imageWidth: number,
-  imageHeight: number,
-): Rect | null {
-  const ratio = start.w / start.h;
+  ratio: number,
+  bounds: Bounds | null,
+): { rect: Rect; flipX: boolean; flipY: boolean } | null {
   const dirX = handle.includes("e") ? 1 : handle.includes("w") ? -1 : 0;
   const dirY = handle.includes("s") ? 1 : handle.includes("n") ? -1 : 0;
   // Fixed point: the opposite edge on dragged axes, the center on the other.
@@ -213,16 +248,25 @@ function resizeKeepingRatio(
     w = h * ratio;
   }
 
-  const maxW = sideX > 0 ? imageWidth - ax : sideX < 0 ? ax : 2 * Math.min(ax, imageWidth - ax);
-  const maxH = sideY > 0 ? imageHeight - ay : sideY < 0 ? ay : 2 * Math.min(ay, imageHeight - ay);
-  const scale = Math.min(1, maxW / w, maxH / h);
-  w = Math.round(w * scale);
-  h = Math.round(h * scale);
+  if (bounds) {
+    const { width, height } = bounds;
+    const maxW = sideX > 0 ? width - ax : sideX < 0 ? ax : 2 * Math.min(ax, width - ax);
+    const maxH = sideY > 0 ? height - ay : sideY < 0 ? ay : 2 * Math.min(ay, height - ay);
+    const scale = Math.min(1, maxW / w, maxH / h);
+    w *= scale;
+    h *= scale;
+  }
+  w = Math.round(w);
+  h = Math.round(h);
   if (w < 1 || h < 1) return null;
 
   const x = sideX > 0 ? ax : sideX < 0 ? ax - w : ax - w / 2;
   const y = sideY > 0 ? ay : sideY < 0 ? ay - h : ay - h / 2;
-  return { x: Math.round(x), y: Math.round(y), w, h };
+  return {
+    rect: { x: Math.round(x), y: Math.round(y), w, h },
+    flipX: dirX !== 0 && sideX !== dirX,
+    flipY: dirY !== 0 && sideY !== dirY,
+  };
 }
 
 /** Tracks whether Option/Alt is held, for the zoom-out cursor. */

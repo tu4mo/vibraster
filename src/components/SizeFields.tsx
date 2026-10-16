@@ -7,7 +7,8 @@ type Props = {
   /** Aspect ratio to keep (width / height), or null when unlocked. */
   lockedRatio: number | null;
   onChange: (width: number, height: number) => void;
-  onLockChange: (locked: boolean) => void;
+  /** Omit to hide the aspect-ratio checkbox. */
+  onLockChange?: (locked: boolean) => void;
 };
 
 const toNumber = (value: number | string) => (typeof value === "number" ? value : 0);
@@ -43,11 +44,13 @@ export function SizeFields({ width, height, lockedRatio, onChange, onLockChange 
           onChange(lockedRatio ? Math.max(1, Math.round(h * lockedRatio)) : width, h);
         }}
       />
-      <Checkbox
-        label="Keep aspect ratio"
-        checked={lockedRatio !== null}
-        onChange={(e) => onLockChange(e.currentTarget.checked)}
-      />
+      {onLockChange && (
+        <Checkbox
+          label="Keep aspect ratio"
+          checked={lockedRatio !== null}
+          onChange={(e) => onLockChange(e.currentTarget.checked)}
+        />
+      )}
     </Stack>
   );
 }

@@ -5,11 +5,21 @@ import {
   cloneCanvas,
   context2d,
   createCanvas,
+  isValidSize,
   resizeCanvasArea,
   scaleCanvas,
 } from "./canvas.ts";
 
-type Floating = { canvas: HTMLCanvasElement; x: number; y: number };
+type Floating = {
+  /** What is drawn: `source` scaled to the selection size and possibly mirrored. */
+  canvas: HTMLCanvasElement;
+  /** The pixels as first lifted or pasted; scaling always starts from these. */
+  source: HTMLCanvasElement;
+  x: number;
+  y: number;
+  flipX: boolean;
+  flipY: boolean;
+};
 
 type Snapshot = { image: HTMLCanvasElement; selection: Rect | null };
 
@@ -145,7 +155,7 @@ export class Editor {
     const ctx = context2d(this.image);
     ctx.fillStyle = background;
     ctx.fillRect(x, y, w, h);
-    this.floating = { canvas, x, y };
+    this.floating = { canvas, source: canvas, x, y, flipX: false, flipY: false };
     this.emit();
   }
 
@@ -154,6 +164,57 @@ export class Editor {
     this.floating.x = x;
     this.floating.y = y;
     this.selection = { ...this.selection, x, y };
+    this.emit();
+  }
+
+  /**
+   * Scale the floating pixels to fill `rect`, mirrored as given. Always drawn
+   * from the original pixels, so repeated scaling doesn't degrade them.
+   */
+  transformFloating(rect: Rect, flipX: boolean, flipY: boolean) {
+    const f = this.floating;
+    if (!f || !isValidSize(rect.w) || !isValidSize(rect.h)) return;
+    const canvas = createCanvas(rect.w, rect.h);
+    const ctx = context2d(canvas);
+    ctx.imageSmoothingQuality = "high";
+    ctx.translate(flipX ? rect.w : 0, flipY ? rect.h : 0);
+    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+    ctx.drawImage(f.source, 0, 0, rect.w, rect.h);
+    this.floating = { ...f, canvas, x: rect.x, y: rect.y, flipX, flipY };
+    this.selection = rect;
+    this.emit();
+  }
+
+  /**
+   * The pixels under the selection (or the whole image), including any
+   * floating pixels, as a new canvas. Null when there is nothing to copy.
+   */
+  copySelection(): HTMLCanvasElement | null {
+    if (!this.image) return null;
+    const area = clipRect(this.targetRect(), this.width, this.height);
+    if (!area) return null;
+    const out = createCanvas(area.w, area.h);
+    const ctx = context2d(out);
+    ctx.drawImage(this.image, -area.x, -area.y);
+    if (this.floating) {
+      ctx.drawImage(this.floating.canvas, this.floating.x - area.x, this.floating.y - area.y);
+    }
+    return out;
+  }
+
+  /**
+   * Paste `pasted` as floating pixels, centered on the selection (or the
+   * image), so it can be moved before it merges in. Selects the pasted area.
+   */
+  paste(pasted: HTMLCanvasElement) {
+    if (!this.image) return;
+    this.commitFloating();
+    this.pushHistory();
+    const { x, y, w, h } = this.targetRect();
+    const px = Math.round(x + (w - pasted.width) / 2);
+    const py = Math.round(y + (h - pasted.height) / 2);
+    this.floating = { canvas: pasted, source: pasted, x: px, y: py, flipX: false, flipY: false };
+    this.selection = { x: px, y: py, w: pasted.width, h: pasted.height };
     this.emit();
   }
 

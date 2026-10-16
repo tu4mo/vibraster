@@ -27,6 +27,21 @@ export function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
   return copy;
 }
 
+/** A new image of the given size, filled with `color`, or transparent when null. */
+export function createBlankImage(
+  width: number,
+  height: number,
+  color: string | null,
+): HTMLCanvasElement {
+  const canvas = createCanvas(width, height);
+  if (color) {
+    const ctx = context2d(canvas);
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, width, height);
+  }
+  return canvas;
+}
+
 export async function loadImageFile(file: Blob): Promise<HTMLCanvasElement> {
   const bitmap = await createImageBitmap(file);
   const canvas = createCanvas(bitmap.width, bitmap.height);

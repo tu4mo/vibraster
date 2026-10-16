@@ -23,6 +23,9 @@ import {
   IconArrowsMove,
   IconDeviceFloppy,
   IconEraser,
+  IconClipboard,
+  IconCopy,
+  IconFilePlus,
   IconFolderOpen,
   IconFrame,
   IconGripHorizontal,
@@ -38,10 +41,11 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CanvasView, type Tool } from "./components/CanvasView.tsx";
 import { ColorControls } from "./components/ColorControls.tsx";
+import { NewImageDialog } from "./components/NewImageDialog.tsx";
 import { ResizeCanvasDialog } from "./components/ResizeCanvasDialog.tsx";
 import { ResizeImageDialog } from "./components/ResizeImageDialog.tsx";
 import { Tip } from "./components/Tip.tsx";
-import { loadImageFile } from "./editor/canvas.ts";
+import { createBlankImage, loadImageFile } from "./editor/canvas.ts";
 import { useEditor } from "./editor/useEditor.ts";
 
 const ZOOM_STEPS = [0.05, 0.1, 0.25, 1 / 3, 0.5, 2 / 3, 1, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32];
@@ -73,7 +77,7 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const [foreground, setForeground] = useState("#e5484d");
   const [background, setBackground] = useState("#ffffff");
-  const [dialog, setDialog] = useState<"image" | "canvas" | null>(null);
+  const [dialog, setDialog] = useState<"new" | "image" | "canvas" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const palette = useRef<HTMLDivElement>(null);
@@ -183,6 +187,16 @@ export default function App() {
     ["mod+shift+Z", () => editing && editor.redo()],
     ["mod+Z", () => editing && editor.undo()],
     ["mod+Y", () => editing && editor.redo()],
+    [
+      "mod+C",
+      // Only take over ⌘C with an image open; otherwise let the browser copy text.
+      (e) => {
+        if (!editing) return;
+        e.preventDefault();
+        void copy();
+      },
+      { preventDefault: false },
+    ],
     ["mod+A", () => editing && editor.selectAll()],
     ["mod+D", () => editing && editor.setSelection(null)],
     ["mod+S", () => editing && void save()],
@@ -208,15 +222,66 @@ export default function App() {
     ["X", () => editing && swapColors()],
   ]);
 
-  // Paste an image from the clipboard.
+  /** Paste onto the open image as movable pixels, or open it if there is none. */
+  const pasteImage = useCallback(
+    async (blob: Blob) => {
+      if (!editor.image) {
+        await openFile(new File([blob], "Pasted image.png", { type: blob.type }));
+        return;
+      }
+      try {
+        editor.paste(await loadImageFile(blob));
+        setTool("move");
+        setError(null);
+      } catch {
+        setError("Could not read the pasted image.");
+      }
+    },
+    [editor, openFile],
+  );
+
+  /** Copy the selection (or whole image) to the system clipboard as PNG. */
+  const copy = useCallback(async () => {
+    const canvas = editor.copySelection();
+    if (!canvas) return;
+    // Hand ClipboardItem a promise so the write starts within the user gesture.
+    const png = new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("PNG encoding failed"))),
+        "image/png",
+      ),
+    );
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+    } catch {
+      setError("Could not copy to the clipboard.");
+    }
+  }, [editor]);
+
+  /** Edit → Paste: read the clipboard directly (the browser may ask for permission). */
+  const pasteFromClipboard = useCallback(async () => {
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (type) return await pasteImage(await item.getType(type));
+      }
+      setError("The clipboard has no image.");
+    } catch {
+      setError("Could not read the clipboard. Try ⌘V instead.");
+    }
+  }, [pasteImage]);
+
+  // ⌘V arrives as a paste event, which needs no clipboard permission.
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
-      if (file) void openFile(file);
+      if (!file) return;
+      e.preventDefault();
+      void pasteImage(file);
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [openFile]);
+  }, [pasteImage]);
 
   return (
     <AppShell header={{ height: HEADER_HEIGHT }} footer={{ height: FOOTER_HEIGHT }} padding={0}>
@@ -230,6 +295,13 @@ export default function App() {
             <Menubar.Menu>
               <Menubar.Target>File</Menubar.Target>
               <Menubar.Dropdown>
+                {/* No ⌘N: Chrome reserves it for a new window and pages can't override it. */}
+                <Menu.Item
+                  leftSection={<IconFilePlus {...MENU_ICON} />}
+                  onClick={() => setDialog("new")}
+                >
+                  New…
+                </Menu.Item>
                 <Menu.Item
                   leftSection={<IconFolderOpen {...MENU_ICON} />}
                   rightSection={<Shortcut keys="⌘O" />}
@@ -266,6 +338,22 @@ export default function App() {
                   disabled={!editor.canRedo}
                 >
                   Redo
+                </Menu.Item>
+                <Menu.Divider />
+                <Menu.Item
+                  leftSection={<IconCopy {...MENU_ICON} />}
+                  rightSection={<Shortcut keys="⌘C" />}
+                  onClick={copy}
+                  disabled={!hasImage}
+                >
+                  {hasSelection ? "Copy" : "Copy image"}
+                </Menu.Item>
+                <Menu.Item
+                  leftSection={<IconClipboard {...MENU_ICON} />}
+                  rightSection={<Shortcut keys="⌘V" />}
+                  onClick={pasteFromClipboard}
+                >
+                  Paste
                 </Menu.Item>
                 <Menu.Divider />
                 <Menu.Item
@@ -424,16 +512,21 @@ export default function App() {
               <EmptyState
                 icon={<IconPhoto size={32} stroke={1.5} />}
                 withIndicatorBackground
-                title="Open an image"
+                title="Open or create an image"
                 description="PNG, JPEG, WebP or GIF. You can also drop a file anywhere or paste one."
               >
-                <Button
-                  mt="md"
-                  leftSection={<IconFolderOpen size={16} />}
-                  onClick={fileDialog.open}
-                >
-                  Choose file
-                </Button>
+                <Group mt="md" gap="xs" justify="center">
+                  <Button leftSection={<IconFolderOpen size={16} />} onClick={fileDialog.open}>
+                    Choose file
+                  </Button>
+                  <Button
+                    variant="default"
+                    leftSection={<IconFilePlus size={16} />}
+                    onClick={() => setDialog("new")}
+                  >
+                    New image
+                  </Button>
+                </Group>
               </EmptyState>
             </Center>
           )}
@@ -509,6 +602,17 @@ export default function App() {
           width={editor.width}
           height={editor.height}
           onApply={(w, h) => editor.resizeImage(w, h)}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === "new" && (
+        <NewImageDialog
+          background={background}
+          onCreate={(w, h, fill) => {
+            editor.load(createBlankImage(w, h, fill), "Untitled");
+            setZoom(fitZoom(w, h));
+            setError(null);
+          }}
           onClose={() => setDialog(null)}
         />
       )}
