@@ -20,6 +20,7 @@ import {
   type SetFloatingWindowPosition,
   clamp,
   useFileDialog,
+  useElementSize,
   useHotkeys,
   useWindowEvent,
 } from "@mantine/hooks";
@@ -41,15 +42,19 @@ import {
   IconPlus,
   IconResize,
   IconSelectAll,
+  IconX,
   IconZoomIn,
   IconZoomScan,
 } from "@tabler/icons-react";
-import { Suspense, lazy, useRef, useState } from "react";
+import { Suspense, lazy, useLayoutEffect, useRef, useState } from "react";
 import { CanvasView, type Tool } from "./components/CanvasView.tsx";
 import { ColorControls } from "./components/ColorControls.tsx";
+import { DocumentTabs } from "./components/DocumentTabs.tsx";
 import { Tip } from "./components/Tip.tsx";
 import { canvasToPngBlob, createBlankImage, loadImageFile } from "./editor/canvas.ts";
-import { useEditor } from "./editor/useEditor.ts";
+import { Editor } from "./editor/Editor.ts";
+import { useDocuments } from "./editor/useDocuments.ts";
+import { useEditorVersion } from "./editor/useEditorVersion.ts";
 
 // Dialogs load on first use, which keeps their inputs out of the startup bundle.
 const NewImageDialog = lazy(() =>
@@ -79,16 +84,35 @@ function Shortcut({ keys }: { keys: string }) {
   );
 }
 
+/** Stands in for the active editor while no image is open; never loaded. */
+const NO_IMAGE = new Editor();
+
 const TOOLS: { value: Tool; label: string; shortcut: string; icon: typeof IconMarquee2 }[] = [
   { value: "select", label: "Rectangle select", shortcut: "M", icon: IconMarquee2 },
   { value: "move", label: "Move selection", shortcut: "V", icon: IconArrowsMove },
   { value: "zoom", label: "Zoom (⌥-click to zoom out)", shortcut: "Z", icon: IconZoomIn },
 ];
 
+/** Move the palette `el`, whose top is at `y`, back between `minTop` and the status bar. */
+function keepPaletteInBounds(
+  el: HTMLElement,
+  y: number,
+  minTop: number,
+  setPosition: SetFloatingWindowPosition | null,
+) {
+  const max = window.innerHeight - FOOTER_HEIGHT - PALETTE_MARGIN - el.offsetHeight;
+  const clamped = clamp(y, minTop, max);
+  if (clamped !== y) setPosition?.({ top: clamped });
+}
+
 export default function App() {
-  const [editor, version] = useEditor();
+  const documents = useDocuments();
+  const editor = documents.active?.editor ?? NO_IMAGE;
+  // Re-render on the active image's changes (menus, status bar).
+  useEditorVersion(editor);
+  const zoom = documents.active?.zoom ?? 1;
+  const setZoom = documents.setZoom;
   const [tool, setTool] = useState<Tool>("select");
-  const [zoom, setZoom] = useState(1);
   const [foreground, setForeground] = useState("#e5484d");
   const [background, setBackground] = useState("#ffffff");
   const [dialog, setDialog] = useState<"new" | "image" | "canvas" | null>(null);
@@ -96,22 +120,35 @@ export default function App() {
   const viewport = useRef<HTMLDivElement>(null);
   const palette = useRef<HTMLDivElement>(null);
   const setPalettePosition = useRef<SetFloatingWindowPosition>(null);
+  const { ref: tabListRef, height: tabListHeight } = useElementSize();
+
+  const hasImage = documents.active !== null;
+  const hasSelection = editor.selection !== null;
 
   // FloatingWindow only keeps the palette inside the browser window; also keep
-  // it off the header and status bar. This runs in the same drag step that
-  // moved it, before paint, so the correction never shows. Setting the
+  // it off the header, tabs and status bar. This runs in the same drag step
+  // that moved it, before paint, so the correction never shows. Setting the
   // position calls back here once more, with nothing left to correct.
+  const paletteMinTop = HEADER_HEIGHT + tabListHeight + PALETTE_MARGIN;
   const keepPaletteBelowHeader = ({ y }: { y: number }) => {
-    const el = palette.current;
-    if (!el) return;
-    const min = HEADER_HEIGHT + PALETTE_MARGIN;
-    const max = window.innerHeight - FOOTER_HEIGHT - PALETTE_MARGIN - el.offsetHeight;
-    const clamped = clamp(y, min, max);
-    if (clamped !== y) setPalettePosition.current?.({ top: clamped });
+    if (palette.current) {
+      keepPaletteInBounds(palette.current, y, paletteMinTop, setPalettePosition.current);
+    }
   };
 
-  const hasImage = editor.image !== null;
-  const hasSelection = editor.selection !== null;
+  // The palette opens before the tab strip is measured; once it is, push the
+  // palette down off it.
+  useLayoutEffect(() => {
+    const el = palette.current;
+    if (el) {
+      keepPaletteInBounds(
+        el,
+        el.getBoundingClientRect().top,
+        paletteMinTop,
+        setPalettePosition.current,
+      );
+    }
+  }, [paletteMinTop]);
 
   /** Zoom that fits an image of this size (default: the open one) in the viewport. */
   const fitZoom = (width?: number, height?: number) => {
@@ -130,8 +167,7 @@ export default function App() {
     }
     try {
       const image = await loadImageFile(file);
-      editor.load(image, file.name);
-      setZoom(fitZoom(image.width, image.height));
+      documents.open(image, file.name, fitZoom(image.width, image.height));
       setError(null);
     } catch {
       setError(`Could not read "${file.name}".`);
@@ -140,9 +176,11 @@ export default function App() {
 
   const fileDialog = useFileDialog({
     accept: ACCEPT,
-    multiple: false,
+    multiple: true,
     resetOnOpen: true,
-    onChange: (files) => files?.[0] && void openFile(files[0]),
+    onChange: (files) => {
+      for (const file of files ?? []) void openFile(file);
+    },
   });
 
   const save = async () => {
@@ -219,7 +257,7 @@ export default function App() {
 
   /** Paste onto the open image as movable pixels, or open it if there is none. */
   const pasteImage = async (blob: Blob) => {
-    if (!editor.image) {
+    if (!hasImage) {
       await openFile(new File([blob], "Pasted image.png", { type: blob.type }));
       return;
     }
@@ -299,6 +337,14 @@ export default function App() {
                   disabled={!hasImage}
                 >
                   Save as PNG
+                </Menu.Item>
+                {/* No ⌘W either: browsers close the tab before the page sees it. */}
+                <Menu.Item
+                  leftSection={<IconX {...MENU_ICON} />}
+                  onClick={() => documents.active && documents.close(documents.active.id)}
+                  disabled={!hasImage}
+                >
+                  Close
                 </Menu.Item>
               </Menubar.Dropdown>
             </Menubar.Menu>
@@ -422,68 +468,80 @@ export default function App() {
         </Group>
       </AppShell.Header>
 
-      {/* Tool palette: drag it by the grip at the top. */}
-      <FloatingWindow
-        withBorder
-        shadow="md"
-        radius="md"
-        p={8}
-        ref={palette}
-        initialPosition={{ top: HEADER_HEIGHT + PALETTE_MARGIN, left: 0 }}
-        constrainToViewport
-        constrainOffset={PALETTE_MARGIN}
-        onPositionChange={keepPaletteBelowHeader}
-        setPositionRef={setPalettePosition}
-        dragHandleSelector=".palette-grip"
-        // Above the app shell (100) but below modals (200) and popovers/tooltips (300).
-        zIndex={150}
-        aria-label="Tools"
-      >
-        <Stack gap={4} align="center">
-          <Center className="palette-grip" w={34} h={12} aria-hidden>
-            <IconGripHorizontal size={14} />
-          </Center>
-          <Stack gap={4} role="radiogroup" aria-label="Tools">
-            {TOOLS.map(({ value, label, shortcut, icon: Icon }) => (
-              <Tip key={value} label={label} shortcut={shortcut} position="right">
-                <ActionIcon
-                  size="lg"
-                  variant={tool === value ? "filled" : "subtle"}
-                  color={tool === value ? "blue" : "gray"}
-                  role="radio"
-                  aria-checked={tool === value}
-                  aria-label={label}
-                  onClick={() => setTool(value)}
-                  disabled={!hasImage}
-                >
-                  <Icon {...ICON} />
-                </ActionIcon>
-              </Tip>
-            ))}
+      {/* Tool palette, shown with an image open: drag it by the grip at the top. */}
+      {hasImage && (
+        <FloatingWindow
+          withBorder
+          shadow="md"
+          radius="md"
+          p={8}
+          ref={palette}
+          initialPosition={{ top: paletteMinTop, left: 0 }}
+          constrainToViewport
+          constrainOffset={PALETTE_MARGIN}
+          onPositionChange={keepPaletteBelowHeader}
+          setPositionRef={setPalettePosition}
+          dragHandleSelector=".palette-grip"
+          // Above the app shell (100) but below modals (200) and popovers/tooltips (300).
+          zIndex={150}
+          aria-label="Tools"
+        >
+          <Stack gap={4} align="center">
+            <Center className="palette-grip" w={34} h={12} aria-hidden>
+              <IconGripHorizontal size={14} />
+            </Center>
+            <Stack gap={4} role="radiogroup" aria-label="Tools">
+              {TOOLS.map(({ value, label, shortcut, icon: Icon }) => (
+                <Tip key={value} label={label} shortcut={shortcut} position="right">
+                  <ActionIcon
+                    size="lg"
+                    variant={tool === value ? "filled" : "subtle"}
+                    color={tool === value ? "blue" : "gray"}
+                    role="radio"
+                    aria-checked={tool === value}
+                    aria-label={label}
+                    onClick={() => setTool(value)}
+                  >
+                    <Icon {...ICON} />
+                  </ActionIcon>
+                </Tip>
+              ))}
+            </Stack>
+            {/* One 4px rhythm for everything in the column, divider included. */}
+            <Divider w="100%" />
+            <ColorControls
+              foreground={foreground}
+              background={background}
+              onForegroundChange={setForeground}
+              onBackgroundChange={setBackground}
+              onSwap={swapColors}
+            />
           </Stack>
-          {/* One 4px rhythm for everything in the column, divider included. */}
-          <Divider w="100%" />
-          <ColorControls
-            foreground={foreground}
-            background={background}
-            onForegroundChange={setForeground}
-            onBackgroundChange={setBackground}
-            onSwap={swapColors}
-          />
-        </Stack>
-      </FloatingWindow>
+        </FloatingWindow>
+      )}
 
-      <AppShell.Main>
+      {/* Border-box: the full height less the header and footer padding. */}
+      <AppShell.Main h="100dvh">
         {hasImage ? (
-          <CanvasView
-            ref={viewport}
-            editor={editor}
-            version={version}
-            tool={tool}
-            zoom={zoom}
-            background={background}
-            onZoom={zoomBy}
-          />
+          <DocumentTabs
+            listRef={tabListRef}
+            docs={documents.docs}
+            activeId={documents.activeId}
+            onSelect={documents.select}
+            onClose={documents.close}
+          >
+            {(doc) => (
+              <CanvasView
+                // Only the active tab's view is measured to fit the zoom.
+                ref={doc === documents.active ? viewport : undefined}
+                editor={doc.editor}
+                tool={tool}
+                zoom={doc.zoom}
+                background={background}
+                onZoom={zoomBy}
+              />
+            )}
+          </DocumentTabs>
         ) : (
           <div ref={viewport} className="viewport">
             <Center flex={1}>
@@ -563,15 +621,16 @@ export default function App() {
 
       <Dropzone.FullScreen
         accept={IMAGE_MIME_TYPE}
-        multiple={false}
         activateOnClick={false}
-        onDrop={(files) => files[0] && void openFile(files[0])}
+        onDrop={(files) => {
+          for (const file of files) void openFile(file);
+        }}
         onReject={(rejections) =>
           setError(`"${rejections[0]?.file.name ?? "File"}" is not a supported image.`)
         }
       >
         <Center h="100%">
-          <Text size="xl">Drop image to open</Text>
+          <Text size="xl">Drop images to open</Text>
         </Center>
       </Dropzone.FullScreen>
 
@@ -588,8 +647,7 @@ export default function App() {
           <NewImageDialog
             background={background}
             onCreate={(w, h, fill) => {
-              editor.load(createBlankImage(w, h, fill), "Untitled");
-              setZoom(fitZoom(w, h));
+              documents.open(createBlankImage(w, h, fill), "Untitled", fitZoom(w, h));
               setError(null);
             }}
             onClose={() => setDialog(null)}

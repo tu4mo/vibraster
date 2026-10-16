@@ -1,7 +1,8 @@
 import { clamp, useMergedRef, useWindowEvent } from "@mantine/hooks";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Rect } from "../editor/canvas.ts";
 import type { Editor } from "../editor/Editor.ts";
+import { useEditorVersion } from "../editor/useEditorVersion.ts";
 
 export type Tool = "select" | "move" | "zoom";
 
@@ -28,11 +29,6 @@ type Drag =
 
 type Props = {
   editor: Editor;
-  /**
-   * The editor's change counter. The editor is mutated in place, so this prop
-   * is what tells a memoizing parent (React Compiler) to render this again.
-   */
-  version: number;
   tool: Tool;
   zoom: number;
   /** Fills the gap left behind when moving pixels. */
@@ -46,8 +42,16 @@ type Props = {
 /**
  * The scrolling viewport with the image in it. The whole viewport is the
  * pointer surface, so a selection can start on the empty area around the image.
+ * Memoized so hidden tabs' views skip the parent's re-renders.
  */
-export function CanvasView({ editor, tool, zoom, background, onZoom, ref }: Props) {
+export const CanvasView = memo(function CanvasView({
+  editor,
+  tool,
+  zoom,
+  background,
+  onZoom,
+  ref,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -58,6 +62,8 @@ export function CanvasView({ editor, tool, zoom, background, onZoom, ref }: Prop
     null,
   );
   const altDown = useAltKey();
+  // The editor is mutated in place; subscribing re-renders on its changes.
+  useEditorVersion(editor);
 
   // Selection-only changes don't touch pixels and skip the redraw.
   const pixelVersion = editor.pixelVersion;
@@ -216,7 +222,7 @@ export function CanvasView({ editor, tool, zoom, background, onZoom, ref }: Prop
       </div>
     </div>
   );
-}
+});
 
 /** Whether a press on `el` landed on its own scrollbar rather than its content. */
 function isOnScrollbar(el: HTMLElement, e: { clientX: number; clientY: number }) {

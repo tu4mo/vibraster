@@ -17,7 +17,7 @@
 
 .viewport {
   display: flex;
-  height: calc(100dvh - var(--app-shell-header-offset, 0px) - var(--app-shell-footer-offset, 0px));
+  height: 100%;
   overflow: auto;
   padding: 32px;
   background: var(--viewport-bg);
