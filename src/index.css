@@ -21,6 +21,11 @@
   overflow: auto;
   padding: 32px;
   background: var(--viewport-bg);
+
+  /* The select tool can start a selection around the image too. */
+  &:has(> .stage[data-tool="select"]) {
+    cursor: crosshair;
+  }
 }
 
 .stage {
@@ -200,4 +205,14 @@
   background: transparent;
   opacity: 0.35;
   color: inherit;
+}
+
+/* The selection ActionBar's Affix spans the full width; let presses beside
+   the bar through to the canvas area (to deselect or start a selection). */
+.mantine-Affix-root:has(> .mantine-ActionBar-root) {
+  pointer-events: none;
+
+  & > .mantine-ActionBar-root {
+    pointer-events: auto;
+  }
 }

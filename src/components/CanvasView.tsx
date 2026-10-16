@@ -43,6 +43,7 @@ type Props = {
 
 export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const altDown = useAltKey();
 
@@ -59,7 +60,43 @@ export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }
   const clampX = (x: number) => Math.min(editor.width, Math.max(0, Math.round(x)));
   const clampY = (y: number) => Math.min(editor.height, Math.max(0, Math.round(y)));
 
-  const onPointerDown = (e: React.PointerEvent) => {
+  const onDragMove = (e: PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    const p = toImage(e);
+    if (d.kind === "select") {
+      const x = clampX(p.x);
+      const y = clampY(p.y);
+      editor.setSelection({
+        x: Math.min(x, d.startX),
+        y: Math.min(y, d.startY),
+        w: Math.abs(x - d.startX),
+        h: Math.abs(y - d.startY),
+      });
+    } else if (d.kind === "outline" && editor.selection) {
+      // Keep the whole outline inside the image so it never shrinks.
+      const { w, h } = editor.selection;
+      const x = Math.min(editor.width - w, Math.max(0, Math.round(p.x - d.offsetX)));
+      const y = Math.min(editor.height - h, Math.max(0, Math.round(p.y - d.offsetY)));
+      editor.setSelection({ x, y, w, h });
+    } else if (d.kind === "resize") {
+      // The outline stays inside the image.
+      const bounds = { width: editor.width, height: editor.height };
+      const ratio = e.shiftKey ? d.start.w / d.start.h : null;
+      const result = resizeRect(d.handle, d.start, p, ratio, bounds);
+      if (result) editor.setSelection(result.rect);
+    } else if (d.kind === "scale") {
+      // Pixels may extend past the image; crossing the opposite edge mirrors them.
+      const result = resizeRect(d.handle, d.start, p, e.shiftKey ? d.ratio : null, null);
+      if (result) {
+        editor.transformFloating(result.rect, d.flipX !== result.flipX, d.flipY !== result.flipY);
+      }
+    } else if (d.kind === "move") {
+      editor.moveFloatingTo(Math.round(p.x - d.offsetX), Math.round(p.y - d.offsetY));
+    }
+  };
+
+  const onPointerDown = (e: PointerEvent | React.PointerEvent) => {
     if (e.button !== 0) return;
     const p = toImage(e);
     if (tool === "zoom") {
@@ -109,49 +146,36 @@ export function CanvasView({ editor, version, tool, zoom, background, onZoomAt }
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
     window.addEventListener("blur", end);
-    e.currentTarget.setPointerCapture(pointerId);
+    (e.currentTarget as Element).setPointerCapture(pointerId);
   };
 
-  const onDragMove = (e: PointerEvent) => {
-    const d = drag.current;
-    if (!d) return;
-    const p = toImage(e);
-    if (d.kind === "select") {
-      const x = clampX(p.x);
-      const y = clampY(p.y);
-      editor.setSelection({
-        x: Math.min(x, d.startX),
-        y: Math.min(y, d.startY),
-        w: Math.abs(x - d.startX),
-        h: Math.abs(y - d.startY),
-      });
-    } else if (d.kind === "outline" && editor.selection) {
-      // Keep the whole outline inside the image so it never shrinks.
-      const { w, h } = editor.selection;
-      const x = Math.min(editor.width - w, Math.max(0, Math.round(p.x - d.offsetX)));
-      const y = Math.min(editor.height - h, Math.max(0, Math.round(p.y - d.offsetY)));
-      editor.setSelection({ x, y, w, h });
-    } else if (d.kind === "resize") {
-      // The outline stays inside the image.
-      const bounds = { width: editor.width, height: editor.height };
-      const ratio = e.shiftKey ? d.start.w / d.start.h : null;
-      const result = resizeRect(d.handle, d.start, p, ratio, bounds);
-      if (result) editor.setSelection(result.rect);
-    } else if (d.kind === "scale") {
-      // Pixels may extend past the image; crossing the opposite edge mirrors them.
-      const result = resizeRect(d.handle, d.start, p, e.shiftKey ? d.ratio : null, null);
-      if (result) {
-        editor.transformFloating(result.rect, d.flipX !== result.flipX, d.flipY !== result.flipY);
-      }
-    } else if (d.kind === "move") {
-      editor.moveFloatingTo(Math.round(p.x - d.offsetX), Math.round(p.y - d.offsetY));
-    }
-  };
+  // The select tool can also start a selection on the empty area around the
+  // image; the selection is clamped to the image as it is dragged.
+  const latestPointerDown = useRef(onPointerDown);
+  useEffect(() => {
+    latestPointerDown.current = onPointerDown;
+  });
+  useEffect(() => {
+    const area = stageRef.current?.parentElement;
+    if (!area || tool !== "select") return;
+    const down = (e: PointerEvent) => {
+      if (e.target !== area) return;
+      // Ignore presses on the area's own scrollbars.
+      const rect = area.getBoundingClientRect();
+      const x = e.clientX - rect.left - area.clientLeft;
+      const y = e.clientY - rect.top - area.clientTop;
+      if (x >= area.clientWidth || y >= area.clientHeight) return;
+      latestPointerDown.current(e);
+    };
+    area.addEventListener("pointerdown", down);
+    return () => area.removeEventListener("pointerdown", down);
+  }, [tool]);
 
   const sel = editor.selection;
 
   return (
     <div
+      ref={stageRef}
       className="stage"
       data-tool={tool}
       data-zoom-out={tool === "zoom" && altDown ? "" : undefined}
