@@ -5,4 +5,4 @@
 
 # Git
 
-- Commit and push directly to `main`. Don't create branches unless asked.
+- Only commit, push or create branches when asked; commit and push directly to `main`.
