@@ -52,6 +52,9 @@ export class Editor {
 
   getVersion = () => this.version;
 
+  /** Bound like `getVersion`, for `useSyncExternalStore` snapshots. */
+  hasSelection = () => this.selection !== null;
+
   get width() {
     return this.image?.width ?? 0;
   }
@@ -160,18 +163,16 @@ export class Editor {
   }
 
   /**
-   * Lift the selected pixels so they can be moved, filling the gap they leave
-   * with `background`. No-op if already lifted.
+   * Lift the selected pixels so they can be moved, leaving a transparent gap.
+   * No-op if already lifted.
    */
-  beginMove(background: string) {
+  beginMove() {
     if (!this.image || !this.selection || this.floating) return;
     this.pushHistory();
     const { x, y, w, h } = this.selection;
     const canvas = createCanvas(w, h);
     context2d(canvas).drawImage(this.image, x, y, w, h, 0, 0, w, h);
-    const ctx = context2d(this.image);
-    ctx.fillStyle = background;
-    ctx.fillRect(x, y, w, h);
+    context2d(this.image).clearRect(x, y, w, h);
     this.floating = { canvas, source: canvas, x, y, flipX: false, flipY: false };
     this.emit();
   }
@@ -193,6 +194,13 @@ export class Editor {
     const f = this.floating;
     if (!f || !isValidSize(rect.w) || !isValidSize(rect.h)) return;
     if (sameRect(rect, this.selection) && flipX === f.flipX && flipY === f.flipY) return;
+    this.drawFloating(rect, flipX, flipY);
+  }
+
+  /** Redraw the floating pixels from their source into `rect`, mirrored as given. */
+  private drawFloating(rect: Rect, flipX: boolean, flipY: boolean) {
+    const f = this.floating;
+    if (!f) return;
     const canvas = createCanvas(rect.w, rect.h);
     const ctx = context2d(canvas);
     ctx.imageSmoothingQuality = "high";
@@ -202,6 +210,54 @@ export class Editor {
     this.floating = { ...f, canvas, x: rect.x, y: rect.y, flipX, flipY };
     this.selection = rect;
     this.emit();
+  }
+
+  /** Mirror the selected pixels in place, lifting them first if needed. */
+  flipSelection(axis: "horizontal" | "vertical") {
+    this.beginMove();
+    const f = this.floating;
+    if (!f || !this.selection) return;
+    const horizontal = axis === "horizontal";
+    this.transformFloating(
+      this.selection,
+      horizontal ? !f.flipX : f.flipX,
+      horizontal ? f.flipY : !f.flipY,
+    );
+  }
+
+  /**
+   * Turn the selected pixels a quarter turn about their center, lifting them
+   * first if needed. Rotates the original pixels, so it stays lossless.
+   */
+  rotateSelection(direction: "clockwise" | "counterclockwise") {
+    this.beginMove();
+    const f = this.floating;
+    const sel = this.selection;
+    if (!f || !sel) return;
+    const { width: w, height: h } = f.source;
+    const source = createCanvas(h, w);
+    const ctx = context2d(source);
+    if (direction === "clockwise") {
+      ctx.translate(h, 0);
+      ctx.rotate(Math.PI / 2);
+    } else {
+      ctx.translate(0, w);
+      ctx.rotate(-Math.PI / 2);
+    }
+    ctx.drawImage(f.source, 0, 0);
+    // A quarter turn swaps the axes, so a mirror on one becomes one on the other.
+    // Drawn even when the rect and flips come out the same, as a square's would.
+    this.floating = { ...f, source };
+    this.drawFloating(
+      {
+        x: Math.round(sel.x + (sel.w - sel.h) / 2),
+        y: Math.round(sel.y + (sel.h - sel.w) / 2),
+        w: sel.h,
+        h: sel.w,
+      },
+      f.flipY,
+      f.flipX,
+    );
   }
 
   /**

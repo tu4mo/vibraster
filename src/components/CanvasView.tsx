@@ -12,6 +12,10 @@ type Handle = (typeof HANDLES)[number];
 
 /** Zoom at which the pixel grid appears (each image pixel is this many screen pixels). */
 const PIXEL_GRID_MIN_ZOOM = 6;
+/** Space kept around the image when it fits in the viewport. */
+const PADDING = 32;
+/** Extra room to scroll past the image edges once it overflows, as a share of the viewport. */
+const OVERSCROLL = 0.25;
 
 type Drag =
   | { kind: "select"; startX: number; startY: number }
@@ -31,8 +35,6 @@ type Props = {
   editor: Editor;
   tool: Tool;
   zoom: number;
-  /** Fills the gap left behind when moving pixels. */
-  background: string;
   /** Zoom tool click; the clicked point is kept under the cursor. */
   onZoom: (direction: 1 | -1) => void;
   /** The scrolling viewport, which the parent measures to fit the zoom. */
@@ -44,14 +46,7 @@ type Props = {
  * pointer surface, so a selection can start on the empty area around the image.
  * Memoized so hidden tabs' views skip the parent's re-renders.
  */
-export const CanvasView = memo(function CanvasView({
-  editor,
-  tool,
-  zoom,
-  background,
-  onZoom,
-  ref,
-}: Props) {
+export const CanvasView = memo(function CanvasView({ editor, tool, zoom, onZoom, ref }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -62,6 +57,7 @@ export const CanvasView = memo(function CanvasView({
     null,
   );
   const altDown = useAltKey();
+  const view = useClientSize(viewportRef);
   // The editor is mutated in place; subscribing re-renders on its changes.
   useEditorVersion(editor);
 
@@ -119,14 +115,14 @@ export const CanvasView = memo(function CanvasView({
 
     // Move tool.
     if (sel && handle) {
-      editor.beginMove(background);
+      editor.beginMove();
       const f = editor.floating;
       if (!f) return null;
       const ratio = f.source.width / f.source.height;
       return { kind: "scale", handle, start: sel, flipX: f.flipX, flipY: f.flipY, ratio };
     }
     if (sel && inside) {
-      editor.beginMove(background);
+      editor.beginMove();
       return { kind: "move", offsetX: p.x - sel.x, offsetY: p.y - sel.y };
     }
     if (onEmptyArea) editor.setSelection(null);
@@ -185,6 +181,8 @@ export const CanvasView = memo(function CanvasView({
   };
 
   const sel = editor.selection;
+  const stageWidth = editor.width * zoom;
+  const stageHeight = editor.height * zoom;
 
   return (
     <div
@@ -195,12 +193,12 @@ export const CanvasView = memo(function CanvasView({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onLostPointerCapture={() => (drag.current = null)}
+      style={{
+        paddingInline: padding(stageWidth, view.width),
+        paddingBlock: padding(stageHeight, view.height),
+      }}
     >
-      <div
-        ref={stageRef}
-        className="stage"
-        style={{ width: editor.width * zoom, height: editor.height * zoom }}
-      >
+      <div ref={stageRef} className="stage" style={{ width: stageWidth, height: stageHeight }}>
         <canvas ref={canvasRef} className={zoom > 1 ? "pixelated" : undefined} />
         {zoom >= PIXEL_GRID_MIN_ZOOM && (
           <div className="pixel-grid" style={{ "--cell": `${zoom}px` } as React.CSSProperties} />
@@ -321,6 +319,36 @@ function resizeKeepingRatio(
 }
 
 /** Tracks whether Option/Alt is held, for the zoom-out cursor. */
+/**
+ * Padding on each side of an image `size` px long in a viewport `view` px
+ * long. The extra overscroll grows with the overflow, so an image that just
+ * fits gets no scrollbar and zooming past that never jumps.
+ */
+function padding(size: number, view: number) {
+  return PADDING + clamp(size + 2 * PADDING - view, 0, view * OVERSCROLL);
+}
+
+/** The element's size inside its borders, padding included, scrollbars not. */
+function useClientSize(ref: React.RefObject<HTMLElement | null>) {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Padding changes also resize the observed box; keep the same size then.
+    const measure = () =>
+      setSize((s) =>
+        s.width === el.clientWidth && s.height === el.clientHeight
+          ? s
+          : { width: el.clientWidth, height: el.clientHeight },
+      );
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref]);
+  return size;
+}
+
 function useAltKey() {
   const [down, setDown] = useState(false);
   useWindowEvent("keydown", (e) => setDown(e.altKey));

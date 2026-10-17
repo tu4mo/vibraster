@@ -17,7 +17,6 @@
   display: flex;
   height: 100%;
   overflow: auto;
-  padding: 32px;
   /* Matches the active tab above it, which shows the body color. */
   background: var(--mantine-color-body);
   user-select: none;
@@ -153,8 +152,8 @@
   }
 }
 
-/* Fill / background swatches: a ring in the panel color separates the overlap,
-   and a thin outer edge keeps white or black swatches visible in either theme. */
+/* Color picker swatch: a ring in the panel color and a thin outer edge keep
+   white or black swatches visible in either theme. */
 .color-swatch {
   padding: 0;
   border: 0;

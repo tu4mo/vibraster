@@ -1,31 +1,31 @@
-import { ActionIcon, Checkbox, ColorSwatch, Group, Input, SimpleGrid, Text } from "@mantine/core";
+import { ActionIcon, Input, SimpleGrid, Text } from "@mantine/core";
 import { IconPointFilled } from "@tabler/icons-react";
 import { useState } from "react";
 import type { Anchor } from "../editor/canvas.ts";
+import { FillField } from "./FillField.tsx";
 import { SizeDialog } from "./SizeDialog.tsx";
 import { SizeFields } from "./SizeFields.tsx";
 
 type Props = {
   width: number;
   height: number;
-  background: string;
   onApply: (width: number, height: number, anchor: Anchor, background: string | null) => void;
   onClose: () => void;
 };
 
 const ANCHORS: Anchor[] = [0, 1, 2].flatMap((row) => [0, 1, 2].map((col) => [col, row] as Anchor));
 
-export function ResizeCanvasDialog({ width, height, background, onApply, onClose }: Props) {
+export function ResizeCanvasDialog({ width, height, onApply, onClose }: Props) {
   const [size, setSize] = useState({ w: width, h: height });
   const [anchor, setAnchor] = useState<Anchor>([1, 1]);
-  const [fill, setFill] = useState(true);
+  const [fill, setFill] = useState<string | null>("#ffffff");
 
   return (
     <SizeDialog
       title="Canvas size"
       submitLabel="Apply"
       size={size}
-      onSubmit={() => onApply(size.w, size.h, anchor, fill ? background : null)}
+      onSubmit={() => onApply(size.w, size.h, anchor, fill)}
       onClose={onClose}
     >
       <Text size="sm" c="dimmed">
@@ -55,17 +55,7 @@ export function ResizeCanvasDialog({ width, height, background, onApply, onClose
           })}
         </SimpleGrid>
       </Input.Wrapper>
-      <Checkbox
-        checked={fill}
-        onChange={(e) => setFill(e.currentTarget.checked)}
-        label={
-          <Group gap={6} wrap="nowrap">
-            Fill new area with background color
-            <ColorSwatch color={background} size={14} />
-          </Group>
-        }
-        description={fill ? undefined : "New area will be transparent."}
-      />
+      <FillField label="New area" value={fill} onChange={setFill} />
     </SizeDialog>
   );
 }

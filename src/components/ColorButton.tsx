@@ -1,83 +1,30 @@
 import {
   ActionIcon,
-  Center,
   ColorPicker,
   ColorSwatch,
   Group,
   Popover,
+  type PopoverProps,
   Stack,
   Text,
   TextInput,
 } from "@mantine/core";
 import { useEyeDropper } from "@mantine/hooks";
-import { IconArrowsExchange, IconColorPicker } from "@tabler/icons-react";
+import { IconColorPicker } from "@tabler/icons-react";
 import { useState } from "react";
+import { SWATCHES } from "./swatches.ts";
 import { Tip } from "./Tip.tsx";
 
-const SWATCHES = [
-  "#000000",
-  "#ffffff",
-  "#868e96",
-  "#e5484d",
-  "#f76707",
-  "#f5c518",
-  "#40c057",
-  "#22b8cf",
-  "#228be6",
-  "#7950f2",
-  "#be4bdb",
-  "#e64980",
-];
-
 type Props = {
-  foreground: string;
-  background: string;
-  onForegroundChange: (color: string) => void;
-  onBackgroundChange: (color: string) => void;
-  onSwap: () => void;
-};
-
-/**
- * Fill swatch, swap button and background swatch, stacked. Each is a 34px slot
- * so the column lines up with the tool buttons above it.
- */
-export function ColorControls({
-  foreground,
-  background,
-  onForegroundChange,
-  onBackgroundChange,
-  onSwap,
-}: Props) {
-  return (
-    <>
-      <Center w={34} h={34}>
-        <ColorButton label="Fill color" color={foreground} onChange={onForegroundChange} />
-      </Center>
-      <Tip label="Swap colors" shortcut="X" position="right">
-        <ActionIcon
-          variant="subtle"
-          color="gray"
-          size="lg"
-          aria-label="Swap colors"
-          onClick={onSwap}
-        >
-          <IconArrowsExchange size={16} stroke={1.75} style={{ rotate: "90deg" }} />
-        </ActionIcon>
-      </Tip>
-      <Center w={34} h={34}>
-        <ColorButton label="Background color" color={background} onChange={onBackgroundChange} />
-      </Center>
-    </>
-  );
-}
-
-type ColorButtonProps = {
   label: string;
   color: string;
   onChange: (color: string) => void;
+  /** Where the picker and tooltip open from the swatch. */
+  position?: PopoverProps["position"];
 };
 
-function ColorButton({ label, color, onChange }: ColorButtonProps) {
+/** A color swatch that opens a picker with presets, a hex field and an eyedropper. */
+export function ColorButton({ label, color, onChange, position = "top" }: Props) {
   const eyeDropper = useEyeDropper();
   // Text being typed into the hex field; null shows the current color.
   const [draft, setDraft] = useState<string | null>(null);
@@ -90,7 +37,7 @@ function ColorButton({ label, color, onChange }: ColorButtonProps) {
 
   return (
     <Popover
-      position="right-start"
+      position={position}
       withArrow
       shadow="md"
       opened={opened}
@@ -101,12 +48,12 @@ function ColorButton({ label, color, onChange }: ColorButtonProps) {
       onClose={() => setDraft(null)}
     >
       <Popover.Target>
-        <Tip label={label} position="right" disabled={opened}>
+        <Tip label={label} position={position} disabled={opened}>
           <ColorSwatch
             component="button"
             type="button"
             color={color}
-            size={18}
+            size={16}
             radius="sm"
             aria-label={label}
             onClick={() => setOpened((o) => !o)}

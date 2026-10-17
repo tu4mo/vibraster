@@ -1,7 +1,7 @@
 import { AppShell, Center, Group, Text, Title } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { useElementSize, useFileDialog, useHotkeys, useWindowEvent } from "@mantine/hooks";
-import { Suspense, lazy, useRef, useState } from "react";
+import { Suspense, lazy, useRef, useState, useSyncExternalStore } from "react";
 import { CanvasView, type Tool } from "./components/CanvasView.tsx";
 import { DocumentTabs } from "./components/DocumentTabs.tsx";
 import { MainMenu } from "./components/MainMenu.tsx";
@@ -38,14 +38,16 @@ export default function App() {
   const zoom = documents.active?.zoom ?? 1;
   const setZoom = documents.setZoom;
   const [tool, setTool] = useState<Tool>("select");
-  const [foreground, setForeground] = useState("#e5484d");
-  const [background, setBackground] = useState("#ffffff");
+  const [fillColor, setFillColor] = useState("#e5484d");
   const [dialog, setDialog] = useState<"new" | "image" | "canvas" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const { ref: tabListRef, height: tabListHeight } = useElementSize();
 
   const hasImage = documents.active !== null;
+  const hasSelection = useSyncExternalStore(editor.subscribe, editor.hasSelection);
+  // The move tool needs a selection; fall back to selecting once it's gone.
+  if (tool === "move" && !hasSelection) setTool("select");
 
   /** Zoom that fits an image of this size (default: the open one) in the viewport. */
   const fitZoom = (width?: number, height?: number) => {
@@ -105,11 +107,6 @@ export default function App() {
     );
   };
 
-  const swapColors = () => {
-    setForeground(background);
-    setBackground(foreground);
-  };
-
   // Shortcuts only act with an image open and no dialog showing.
   const editing = hasImage && !dialog;
   useHotkeys([
@@ -146,10 +143,9 @@ export default function App() {
       () => editing && document.activeElement === document.body && editor.setSelection(null),
     ],
     ["M", () => editing && setTool("select")],
-    ["V", () => editing && setTool("move")],
+    ["V", () => editing && hasSelection && setTool("move")],
     ["Z", () => editing && setTool("zoom")],
-    ["F", () => editing && editor.fill(foreground)],
-    ["X", () => editing && swapColors()],
+    ["F", () => editing && editor.fill(fillColor)],
   ]);
 
   /** Paste onto the open image as movable pixels, or open it if there is none. */
@@ -235,11 +231,7 @@ export default function App() {
         <ToolPalette
           tool={tool}
           onToolChange={setTool}
-          foreground={foreground}
-          background={background}
-          onForegroundChange={setForeground}
-          onBackgroundChange={setBackground}
-          onSwapColors={swapColors}
+          hasSelection={hasSelection}
           top={HEADER_HEIGHT + tabListHeight}
           bottom={FOOTER_HEIGHT}
         />
@@ -262,7 +254,6 @@ export default function App() {
                 editor={doc.editor}
                 tool={tool}
                 zoom={doc.zoom}
-                background={background}
                 onZoom={zoomBy}
               />
             )}
@@ -270,7 +261,12 @@ export default function App() {
         ) : (
           <StartScreen ref={viewport} onOpen={fileDialog.open} onNew={() => setDialog("new")} />
         )}
-        <SelectionBar editor={editor} foreground={foreground} />
+        <SelectionBar
+          editor={editor}
+          tool={tool}
+          fillColor={fillColor}
+          onFillColorChange={setFillColor}
+        />
       </AppShell.Main>
 
       <AppShell.Footer>
@@ -303,7 +299,6 @@ export default function App() {
         )}
         {dialog === "new" && (
           <NewImageDialog
-            background={background}
             onCreate={(w, h, fill) => {
               documents.open(createBlankImage(w, h, fill), "Untitled", fitZoom(w, h));
               setError(null);
@@ -315,7 +310,6 @@ export default function App() {
           <ResizeCanvasDialog
             width={editor.width}
             height={editor.height}
-            background={background}
             onApply={(w, h, anchor, bg) => editor.resizeCanvas(w, h, anchor, bg)}
             onClose={() => setDialog(null)}
           />

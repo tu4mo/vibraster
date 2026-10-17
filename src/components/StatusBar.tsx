@@ -9,7 +9,7 @@ type Props = {
   error: string | null;
 };
 
-/** The active image's name and size, or the latest error. */
+/** The active image's size, or the latest error. */
 export function StatusBar({ editor, error }: Props) {
   // The editor is mutated in place; subscribing re-renders on its changes.
   useEditorVersion(editor);
@@ -20,14 +20,9 @@ export function StatusBar({ editor, error }: Props) {
           {error}
         </Text>
       ) : editor.image ? (
-        <>
-          <Text size="xs" c="dimmed">
-            {editor.fileName}
-          </Text>
-          <Text size="xs" c="dimmed">
-            {editor.width} × {editor.height} px
-          </Text>
-        </>
+        <Text size="xs" c="dimmed">
+          {editor.width} × {editor.height} px
+        </Text>
       ) : (
         <Text size="xs" c="dimmed">
           No image

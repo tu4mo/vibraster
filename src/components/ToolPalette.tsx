@@ -1,9 +1,8 @@
-import { ActionIcon, Center, Divider, FloatingWindow, Stack } from "@mantine/core";
+import { ActionIcon, Center, FloatingWindow, Stack } from "@mantine/core";
 import { type SetFloatingWindowPosition, clamp } from "@mantine/hooks";
 import { IconArrowsMove, IconGripHorizontal, IconMarquee2, IconZoomIn } from "@tabler/icons-react";
 import { useLayoutEffect, useRef } from "react";
 import type { Tool } from "./CanvasView.tsx";
-import { ColorControls } from "./ColorControls.tsx";
 import { Tip } from "./Tip.tsx";
 
 /** Gap kept between the palette and the window, header and status bar. */
@@ -19,11 +18,8 @@ const TOOLS: { value: Tool; label: string; shortcut: string; icon: typeof IconMa
 type Props = {
   tool: Tool;
   onToolChange: (tool: Tool) => void;
-  foreground: string;
-  background: string;
-  onForegroundChange: (color: string) => void;
-  onBackgroundChange: (color: string) => void;
-  onSwapColors: () => void;
+  /** The move tool is disabled without one. */
+  hasSelection: boolean;
   /** Height covered at the top of the window (header and tabs), which the palette stays below. */
   top: number;
   /** Height covered at the bottom (status bar), which the palette stays above. */
@@ -46,18 +42,8 @@ function keepInBounds(
   if (clamped !== y) setPosition?.({ top: clamped });
 }
 
-/** The floating tools and colors; drag it by the grip at the top. */
-export function ToolPalette({
-  tool,
-  onToolChange,
-  foreground,
-  background,
-  onForegroundChange,
-  onBackgroundChange,
-  onSwapColors,
-  top,
-  bottom,
-}: Props) {
+/** The floating tools; drag it by the grip at the top. */
+export function ToolPalette({ tool, onToolChange, hasSelection, top, bottom }: Props) {
   const palette = useRef<HTMLDivElement>(null);
   const setPosition = useRef<SetFloatingWindowPosition>(null);
   const minTop = top + MARGIN;
@@ -112,6 +98,7 @@ export function ToolPalette({
                 role="radio"
                 aria-checked={tool === value}
                 aria-label={label}
+                disabled={value === "move" && !hasSelection}
                 onClick={() => onToolChange(value)}
               >
                 <Icon {...ICON} />
@@ -119,15 +106,6 @@ export function ToolPalette({
             </Tip>
           ))}
         </Stack>
-        {/* One 4px rhythm for everything in the column, divider included. */}
-        <Divider w="100%" />
-        <ColorControls
-          foreground={foreground}
-          background={background}
-          onForegroundChange={onForegroundChange}
-          onBackgroundChange={onBackgroundChange}
-          onSwap={onSwapColors}
-        />
       </Stack>
     </FloatingWindow>
   );
