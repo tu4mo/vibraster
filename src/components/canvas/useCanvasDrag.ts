@@ -33,6 +33,7 @@ type Options = {
 /**
  * Pointer handlers for the viewport: selecting, moving and resizing the
  * selection, moving and scaling its pixels, and zoom tool clicks.
+ * Double-clicking the image where nothing is selected selects all.
  */
 export function useCanvasDrag({ editor, tool, zoom, canvasRef, onZoomClick }: Options) {
   const drag = useRef<Drag | null>(null);
@@ -138,7 +139,14 @@ export function useCanvasDrag({ editor, tool, zoom, canvasRef, onZoomClick }: Op
     drag.current = null;
   };
 
-  return { onPointerDown, onPointerMove, onLostPointerCapture };
+  const onDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // The zoom tool zooms on each click instead.
+    if (tool === "zoom" || editor.selection) return;
+    const p = toImage(e);
+    if (p.x >= 0 && p.y >= 0 && p.x <= editor.width && p.y <= editor.height) editor.selectAll();
+  };
+
+  return { onPointerDown, onPointerMove, onLostPointerCapture, onDoubleClick };
 }
 
 /** Whether a press on `el` landed on its own scrollbar rather than its content. */

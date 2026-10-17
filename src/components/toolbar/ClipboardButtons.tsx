@@ -1,4 +1,4 @@
-import { IconClipboard, IconCopy, IconSelectAll } from "@tabler/icons-react";
+import { IconClipboard, IconCopy } from "@tabler/icons-react";
 import type { Editor } from "../../editor/Editor.ts";
 import { useEditorVersion } from "../../editor/useEditorVersion.ts";
 import { ToolbarButton } from "./ToolbarButton.tsx";
@@ -12,7 +12,7 @@ type Props = {
   onPaste: () => void;
 };
 
-/** Copy, paste and select all. */
+/** Copy and paste. */
 export function ClipboardButtons({ editor, hasImage, onCopy, onPaste }: Props) {
   // The editor is mutated in place; subscribing re-renders on its changes.
   useEditorVersion(editor);
@@ -27,13 +27,6 @@ export function ClipboardButtons({ editor, hasImage, onCopy, onPaste }: Props) {
       />
       {/* Enabled without an image: pasting one opens it. */}
       <ToolbarButton label="Paste" shortcut="⌘V" icon={IconClipboard} onClick={onPaste} />
-      <ToolbarButton
-        label="Select all"
-        shortcut="⌘A"
-        icon={IconSelectAll}
-        onClick={() => editor.selectAll()}
-        disabled={!hasImage}
-      />
     </ToolbarGroup>
   );
 }
