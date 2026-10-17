@@ -203,7 +203,7 @@ export default function App() {
 
   return (
     <AppShell header={{ height: HEADER_HEIGHT }} footer={{ height: FOOTER_HEIGHT }} padding={0}>
-      <AppShell.Header>
+      <AppShell.Header withBorder={false}>
         <Group h="100%" px="sm" gap="sm" wrap="nowrap">
           <Title order={1} className="brand">
             Vibraster
