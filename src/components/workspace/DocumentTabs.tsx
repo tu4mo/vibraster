@@ -14,7 +14,7 @@ type Props = {
   children: (doc: Doc) => React.ReactNode;
 };
 
-/** One tab per open image, in a strip that scrolls sideways (by arrows or dragging) when they don't fit. */
+/** One tab per open image, in a strip that scrolls sideways (by arrows or wheel) when they don't fit. */
 export function DocumentTabs({ docs, activeId, onSelect, onClose, listRef, children }: Props) {
   const strip = useRef<HTMLDivElement>(null);
 
@@ -31,16 +31,22 @@ export function DocumentTabs({ docs, activeId, onSelect, onClose, listRef, child
       value={activeId}
       onChange={(value) => value && onSelect(value)}
       activateTabWithKeyboard
-      variant="outline"
+      variant="pills"
     >
       <Stack h="100%" gap={0}>
-        {/* Stretched so the list's bottom border spans the strip. */}
         <Scroller
           ref={strip}
           controlSize={32}
+          draggable={false}
+          style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}
           styles={{ content: { display: "flex", minWidth: "100%" } }}
         >
-          <Tabs.List ref={listRef} aria-label="Open images" style={{ flex: 1, flexWrap: "nowrap" }}>
+          <Tabs.List
+            ref={listRef}
+            aria-label="Open images"
+            p={4}
+            style={{ flex: 1, flexWrap: "nowrap", gap: 4 }}
+          >
             {docs.map(({ id, editor }) => (
               <DocumentTab key={id} id={id} fileName={editor.fileName} onClose={onClose} />
             ))}

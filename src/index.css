@@ -17,7 +17,6 @@
   display: flex;
   height: 100%;
   overflow: auto;
-  /* Matches the active tab above it, which shows the body color. */
   background: var(--mantine-color-body);
   user-select: none;
 
