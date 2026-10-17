@@ -76,18 +76,18 @@ export default function App() {
     <AppShell footer={{ height: FOOTER_HEIGHT }} padding={0}>
       {/* The tab strip only shows with an image open. */}
       <Toolbar top={hasImage ? tabListHeight : 0} bottom={FOOTER_HEIGHT}>
-        <ToolButtons
-          tool={tool}
-          onToolChange={setTool}
-          hasImage={hasImage}
-          hasSelection={hasSelection}
-        />
-        <Divider w="100%" />
         <FileButtons
           hasImage={hasImage}
           onNew={() => setDialog("new")}
           onOpen={files.chooseFiles}
           onSave={files.save}
+        />
+        <Divider w="100%" />
+        <ToolButtons
+          tool={tool}
+          onToolChange={setTool}
+          hasImage={hasImage}
+          hasSelection={hasSelection}
         />
         <Divider w="100%" />
         <HistoryButtons editor={editor} />
