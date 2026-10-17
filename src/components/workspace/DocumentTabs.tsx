@@ -1,6 +1,7 @@
-import { CloseButton, Scroller, Stack, Tabs, Text } from "@mantine/core";
+import { Scroller, Stack, Tabs } from "@mantine/core";
 import { useEffect, useRef } from "react";
-import type { Doc } from "../editor/useDocuments.ts";
+import type { Doc } from "../../editor/useDocuments.ts";
+import { DocumentTab } from "./DocumentTab.tsx";
 
 type Props = {
   docs: Doc[];
@@ -41,28 +42,7 @@ export function DocumentTabs({ docs, activeId, onSelect, onClose, listRef, child
         >
           <Tabs.List ref={listRef} aria-label="Open images" style={{ flex: 1, flexWrap: "nowrap" }}>
             {docs.map(({ id, editor }) => (
-              <Tabs.Tab
-                key={id}
-                value={id}
-                title={editor.fileName}
-                rightSection={
-                  // A span: the tab is itself a button, which can't contain another.
-                  // Keyboard users close tabs with File → Close.
-                  <CloseButton
-                    component="span"
-                    size="xs"
-                    aria-hidden
-                    onClick={(e: React.MouseEvent) => {
-                      e.stopPropagation();
-                      onClose(id);
-                    }}
-                  />
-                }
-              >
-                <Text inherit truncate maw={180}>
-                  {editor.fileName}
-                </Text>
-              </Tabs.Tab>
+              <DocumentTab key={id} id={id} fileName={editor.fileName} onClose={onClose} />
             ))}
           </Tabs.List>
         </Scroller>

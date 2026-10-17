@@ -1,5 +1,4 @@
 import {
-  ActionIcon,
   ColorPicker,
   ColorSwatch,
   Group,
@@ -7,13 +6,12 @@ import {
   type PopoverProps,
   Stack,
   Text,
-  TextInput,
 } from "@mantine/core";
-import { useEyeDropper } from "@mantine/hooks";
-import { IconColorPicker } from "@tabler/icons-react";
 import { useState } from "react";
+import { Tip } from "../ui/Tip.tsx";
+import { EyeDropperButton } from "./EyeDropperButton.tsx";
+import { HexInput } from "./HexInput.tsx";
 import { SWATCHES } from "./swatches.ts";
-import { Tip } from "./Tip.tsx";
 
 type Props = {
   label: string;
@@ -25,15 +23,7 @@ type Props = {
 
 /** A color swatch that opens a picker with presets, a hex field and an eyedropper. */
 export function ColorButton({ label, color, onChange, position = "top" }: Props) {
-  const eyeDropper = useEyeDropper();
-  // Text being typed into the hex field; null shows the current color.
-  const [draft, setDraft] = useState<string | null>(null);
   const [opened, setOpened] = useState(false);
-
-  const pickFromScreen = async () => {
-    const result = await eyeDropper.open().catch(() => undefined);
-    if (result) onChange(result.sRGBHex);
-  };
 
   return (
     <Popover
@@ -45,7 +35,6 @@ export function ColorButton({ label, color, onChange, position = "top" }: Props)
       onDismiss={() => setOpened(false)}
       trapFocus
       returnFocus
-      onClose={() => setDraft(null)}
     >
       <Popover.Target>
         <Tip label={label} position={position} disabled={opened}>
@@ -74,30 +63,10 @@ export function ColorButton({ label, color, onChange, position = "top" }: Props)
             swatches={SWATCHES}
             swatchesPerRow={6}
           />
+          {/* Unmounted while closed, so an unfinished hex value is dropped on close. */}
           <Group gap={4} wrap="nowrap">
-            <TextInput
-              size="xs"
-              flex={1}
-              aria-label={`${label} hex value`}
-              value={draft ?? color}
-              onChange={(e) => {
-                const value = e.currentTarget.value;
-                setDraft(value);
-                if (/^#[0-9a-f]{6}$/i.test(value)) onChange(value.toLowerCase());
-              }}
-              onBlur={() => setDraft(null)}
-            />
-            {eyeDropper.supported && (
-              <Tip label="Pick color from screen">
-                <ActionIcon
-                  variant="default"
-                  aria-label="Pick color from screen"
-                  onClick={pickFromScreen}
-                >
-                  <IconColorPicker size={16} />
-                </ActionIcon>
-              </Tip>
-            )}
+            <HexInput label={`${label} hex value`} color={color} onChange={onChange} />
+            <EyeDropperButton onPick={onChange} />
           </Group>
         </Stack>
       </Popover.Dropdown>

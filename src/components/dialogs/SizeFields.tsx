@@ -1,6 +1,6 @@
 import { Checkbox, NumberInput, Stack } from "@mantine/core";
 import { useState } from "react";
-import { MAX_SIZE } from "../editor/canvas.ts";
+import { MAX_SIZE } from "../../editor/canvas.ts";
 
 type Props = {
   width: number;

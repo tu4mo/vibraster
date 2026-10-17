@@ -4,7 +4,7 @@ import "./index.css";
 import { ActionIcon, Button, MantineProvider, createTheme } from "@mantine/core";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
+import App from "./app/App.tsx";
 
 // Grey subtle buttons hover with the same color as Menubar items (see --hover-bg).
 const isGreySubtle = (props: { variant?: string; color?: string }) =>

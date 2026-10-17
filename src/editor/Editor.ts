@@ -29,7 +29,7 @@ const HISTORY_LIMIT = 50;
 
 /**
  * Holds the document and all editing operations. React subscribes through
- * `subscribe`/`getVersion` (see useEditor); every mutation bumps the version.
+ * `subscribe`/`getVersion` (see useEditorVersion); every mutation bumps the version.
  */
 export class Editor {
   image: HTMLCanvasElement | null = null;

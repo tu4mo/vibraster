@@ -1,7 +1,7 @@
-import { ActionIcon, Input, SimpleGrid, Text } from "@mantine/core";
-import { IconPointFilled } from "@tabler/icons-react";
+import { Text } from "@mantine/core";
 import { useState } from "react";
-import type { Anchor } from "../editor/canvas.ts";
+import type { Anchor } from "../../editor/canvas.ts";
+import { AnchorPicker } from "./AnchorPicker.tsx";
 import { FillField } from "./FillField.tsx";
 import { SizeDialog } from "./SizeDialog.tsx";
 import { SizeFields } from "./SizeFields.tsx";
@@ -12,8 +12,6 @@ type Props = {
   onApply: (width: number, height: number, anchor: Anchor, background: string | null) => void;
   onClose: () => void;
 };
-
-const ANCHORS: Anchor[] = [0, 1, 2].flatMap((row) => [0, 1, 2].map((col) => [col, row] as Anchor));
 
 export function ResizeCanvasDialog({ width, height, onApply, onClose }: Props) {
   const [size, setSize] = useState({ w: width, h: height });
@@ -37,24 +35,7 @@ export function ResizeCanvasDialog({ width, height, onApply, onClose }: Props) {
         onChange={(w, h) => setSize({ w, h })}
         ratio={width / height}
       />
-      <Input.Wrapper label="Anchor">
-        <SimpleGrid cols={3} spacing={4} verticalSpacing={4} w={96} mt={4}>
-          {ANCHORS.map(([col, row]) => {
-            const selected = anchor[0] === col && anchor[1] === row;
-            return (
-              <ActionIcon
-                key={`${col}${row}`}
-                variant={selected ? "filled" : "default"}
-                aria-label={`Anchor column ${col + 1}, row ${row + 1}`}
-                aria-pressed={selected}
-                onClick={() => setAnchor([col, row])}
-              >
-                {selected && <IconPointFilled size={14} />}
-              </ActionIcon>
-            );
-          })}
-        </SimpleGrid>
-      </Input.Wrapper>
+      <AnchorPicker value={anchor} onChange={setAnchor} />
       <FillField label="New area" value={fill} onChange={setFill} />
     </SizeDialog>
   );

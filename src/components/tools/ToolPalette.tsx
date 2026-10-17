@@ -1,19 +1,12 @@
-import { ActionIcon, Center, FloatingWindow, Stack } from "@mantine/core";
+import { Center, FloatingWindow, Stack } from "@mantine/core";
 import { type SetFloatingWindowPosition, clamp } from "@mantine/hooks";
-import { IconArrowsMove, IconGripHorizontal, IconMarquee2, IconZoomIn } from "@tabler/icons-react";
+import { IconGripHorizontal } from "@tabler/icons-react";
 import { useLayoutEffect, useRef } from "react";
-import type { Tool } from "./CanvasView.tsx";
-import { Tip } from "./Tip.tsx";
+import { ToolButtons } from "./ToolButtons.tsx";
+import type { Tool } from "./tool.ts";
 
 /** Gap kept between the palette and the window, header and status bar. */
 const MARGIN = 8;
-const ICON = { size: 18, stroke: 1.75 };
-
-const TOOLS: { value: Tool; label: string; shortcut: string; icon: typeof IconMarquee2 }[] = [
-  { value: "select", label: "Rectangle select", shortcut: "M", icon: IconMarquee2 },
-  { value: "move", label: "Move selection", shortcut: "V", icon: IconArrowsMove },
-  { value: "zoom", label: "Zoom (⌥-click to zoom out)", shortcut: "Z", icon: IconZoomIn },
-];
 
 type Props = {
   tool: Tool;
@@ -88,24 +81,7 @@ export function ToolPalette({ tool, onToolChange, hasSelection, top, bottom }: P
         <Center className="palette-grip" w={34} h={12} aria-hidden>
           <IconGripHorizontal size={14} />
         </Center>
-        <Stack gap={4} role="radiogroup" aria-label="Tools">
-          {TOOLS.map(({ value, label, shortcut, icon: Icon }) => (
-            <Tip key={value} label={label} shortcut={shortcut} position="right">
-              <ActionIcon
-                size="lg"
-                variant={tool === value ? "filled" : "subtle"}
-                color={tool === value ? "blue" : "gray"}
-                role="radio"
-                aria-checked={tool === value}
-                aria-label={label}
-                disabled={value === "move" && !hasSelection}
-                onClick={() => onToolChange(value)}
-              >
-                <Icon {...ICON} />
-              </ActionIcon>
-            </Tip>
-          ))}
-        </Stack>
+        <ToolButtons tool={tool} onToolChange={onToolChange} hasSelection={hasSelection} />
       </Stack>
     </FloatingWindow>
   );
