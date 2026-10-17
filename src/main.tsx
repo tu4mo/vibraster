@@ -6,7 +6,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./app/App.tsx";
 
-// Grey subtle buttons hover with the same color as Menubar items (see --hover-bg).
+// Grey subtle buttons share one hover color (see --hover-bg).
 const isGreySubtle = (props: { variant?: string; color?: string }) =>
   props.variant === "subtle" && props.color === "gray";
 

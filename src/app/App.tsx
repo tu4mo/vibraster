@@ -1,13 +1,16 @@
-import { AppShell } from "@mantine/core";
+import { AppShell, Divider } from "@mantine/core";
 import { useElementSize } from "@mantine/hooks";
 import { useState, useSyncExternalStore } from "react";
 import { CanvasView } from "../components/canvas/CanvasView.tsx";
-import { AppHeader } from "../components/header/AppHeader.tsx";
-import { ZoomControls } from "../components/header/ZoomControls.tsx";
-import { MainMenu } from "../components/menu/MainMenu.tsx";
+import { ClipboardButtons } from "../components/toolbar/ClipboardButtons.tsx";
+import { FileButtons } from "../components/toolbar/FileButtons.tsx";
+import { HistoryButtons } from "../components/toolbar/HistoryButtons.tsx";
+import { ImageButtons } from "../components/toolbar/ImageButtons.tsx";
+import { Toolbar } from "../components/toolbar/Toolbar.tsx";
 import { SelectionBar } from "../components/selection/SelectionBar.tsx";
 import { StatusBar } from "../components/statusbar/StatusBar.tsx";
-import { ToolPalette } from "../components/tools/ToolPalette.tsx";
+import { ZoomControls } from "../components/statusbar/ZoomControls.tsx";
+import { ToolButtons } from "../components/tools/ToolButtons.tsx";
 import type { Tool } from "../components/tools/tool.ts";
 import { DocumentTabs } from "../components/workspace/DocumentTabs.tsx";
 import { StartScreen } from "../components/workspace/StartScreen.tsx";
@@ -21,7 +24,6 @@ import { useImageFiles } from "./useImageFiles.ts";
 import { useShortcuts } from "./useShortcuts.ts";
 import { useZoom } from "./useZoom.ts";
 
-const HEADER_HEIGHT = 52;
 const FOOTER_HEIGHT = 28;
 /** Stands in for the active editor while no image is open; never loaded. */
 const NO_IMAGE = new Editor();
@@ -71,42 +73,40 @@ export default function App() {
   });
 
   return (
-    <AppShell header={{ height: HEADER_HEIGHT }} footer={{ height: FOOTER_HEIGHT }} padding={0}>
-      <AppShell.Header withBorder={false}>
-        <AppHeader>
-          <MainMenu
-            editor={editor}
-            hasImage={hasImage}
-            onNew={() => setDialog("new")}
-            onOpen={files.chooseFiles}
-            onSave={files.save}
-            onClose={() => documents.activeId && documents.close(documents.activeId)}
-            onCopy={clipboard.copy}
-            onPaste={clipboard.paste}
-            onImageSize={() => setDialog("image")}
-            onCanvasSize={() => setDialog("canvas")}
-          />
-          <ZoomControls
-            zoom={zoom}
-            disabled={!hasImage}
-            onZoomBy={zoomBy}
-            onActualSize={() => documents.setZoom(1)}
-            onFit={zoomToFit}
-          />
-        </AppHeader>
-      </AppShell.Header>
-
-      {hasImage && (
-        <ToolPalette
+    <AppShell footer={{ height: FOOTER_HEIGHT }} padding={0}>
+      {/* The tab strip only shows with an image open. */}
+      <Toolbar top={hasImage ? tabListHeight : 0} bottom={FOOTER_HEIGHT}>
+        <ToolButtons
           tool={tool}
           onToolChange={setTool}
+          hasImage={hasImage}
           hasSelection={hasSelection}
-          top={HEADER_HEIGHT + tabListHeight}
-          bottom={FOOTER_HEIGHT}
         />
-      )}
+        <Divider w="100%" />
+        <FileButtons
+          hasImage={hasImage}
+          onNew={() => setDialog("new")}
+          onOpen={files.chooseFiles}
+          onSave={files.save}
+        />
+        <Divider w="100%" />
+        <HistoryButtons editor={editor} />
+        <Divider w="100%" />
+        <ClipboardButtons
+          editor={editor}
+          hasImage={hasImage}
+          onCopy={clipboard.copy}
+          onPaste={clipboard.paste}
+        />
+        <Divider w="100%" />
+        <ImageButtons
+          hasImage={hasImage}
+          onImageSize={() => setDialog("image")}
+          onCanvasSize={() => setDialog("canvas")}
+        />
+      </Toolbar>
 
-      {/* Border-box: the full height less the header and footer padding. */}
+      {/* Border-box: the full height less the footer padding. */}
       <AppShell.Main h="100dvh">
         {hasImage ? (
           <DocumentTabs
@@ -139,7 +139,15 @@ export default function App() {
       </AppShell.Main>
 
       <AppShell.Footer>
-        <StatusBar editor={editor} error={error} />
+        <StatusBar editor={editor} error={error}>
+          <ZoomControls
+            zoom={zoom}
+            disabled={!hasImage}
+            onZoomBy={zoomBy}
+            onActualSize={() => documents.setZoom(1)}
+            onFit={zoomToFit}
+          />
+        </StatusBar>
       </AppShell.Footer>
 
       <ImageDropzone

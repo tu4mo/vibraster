@@ -8,7 +8,7 @@ type Props = {
   activeId: string | null;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
-  /** The tab strip, which the parent measures to keep the palette off it. */
+  /** The tab strip, which the parent measures to keep the toolbar off it. */
   listRef?: React.Ref<HTMLDivElement>;
   /** A tab's content. Inactive tabs stay mounted, so each keeps its scroll position. */
   children: (doc: Doc) => React.ReactNode;

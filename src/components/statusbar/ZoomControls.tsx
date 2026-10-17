@@ -14,23 +14,24 @@ type Props = {
 export function ZoomControls({ zoom, disabled, onZoomBy, onActualSize, onFit }: Props) {
   return (
     <Group gap={2} wrap="nowrap" ml="auto">
-      <Tip label="Zoom out" shortcut="⌘−">
+      <Tip label="Zoom out" shortcut="⌘−" position="top">
         <ActionIcon
+          size="sm"
           variant="subtle"
           color="gray"
           aria-label="Zoom out"
           onClick={() => onZoomBy(-1)}
           disabled={disabled}
         >
-          <IconMinus size={16} />
+          <IconMinus size={14} />
         </ActionIcon>
       </Tip>
-      <Tip label="Actual size">
+      <Tip label="Actual size" position="top">
         <Button
           variant="subtle"
           color="gray"
-          size="compact-sm"
-          w={72}
+          size="compact-xs"
+          w={56}
           onClick={onActualSize}
           disabled={disabled}
           className="tabular"
@@ -38,26 +39,28 @@ export function ZoomControls({ zoom, disabled, onZoomBy, onActualSize, onFit }: 
           {Math.round(zoom * 100)}%
         </Button>
       </Tip>
-      <Tip label="Zoom in" shortcut="⌘=">
+      <Tip label="Zoom in" shortcut="⌘=" position="top">
         <ActionIcon
+          size="sm"
           variant="subtle"
           color="gray"
           aria-label="Zoom in"
           onClick={() => onZoomBy(1)}
           disabled={disabled}
         >
-          <IconPlus size={16} />
+          <IconPlus size={14} />
         </ActionIcon>
       </Tip>
-      <Tip label="Fit to window" shortcut="⌘0">
+      <Tip label="Fit to window" shortcut="⌘0" position="top">
         <ActionIcon
+          size="sm"
           variant="subtle"
           color="gray"
           aria-label="Fit to window"
           onClick={onFit}
           disabled={disabled}
         >
-          <IconZoomScan size={16} />
+          <IconZoomScan size={14} />
         </ActionIcon>
       </Tip>
     </Group>

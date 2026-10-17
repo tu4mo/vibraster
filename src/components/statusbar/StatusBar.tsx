@@ -7,10 +7,12 @@ type Props = {
   editor: Editor;
   /** Shown instead of the image details while set. */
   error: string | null;
+  /** Controls placed after the details (the zoom controls). */
+  children?: React.ReactNode;
 };
 
-/** The active image's size, or the latest error. */
-export function StatusBar({ editor, error }: Props) {
+/** The active image's size, or the latest error, then `children`. */
+export function StatusBar({ editor, error, children }: Props) {
   // The editor is mutated in place; subscribing re-renders on its changes.
   useEditorVersion(editor);
   return (
@@ -28,6 +30,7 @@ export function StatusBar({ editor, error }: Props) {
           No image
         </Text>
       )}
+      {children}
     </Group>
   );
 }

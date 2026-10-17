@@ -14,7 +14,6 @@ export function DocumentTab({ id, fileName, onClose }: Props) {
       title={fileName}
       rightSection={
         // A span: the tab is itself a button, which can't contain another.
-        // Keyboard users close tabs with File → Close.
         <CloseButton
           component="span"
           size="xs"

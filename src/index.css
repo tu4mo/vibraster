@@ -3,7 +3,7 @@
 :root {
   --checker-a: #ffffff;
   --checker-b: #d4d4d8;
-  /* Matches Mantine's Menubar item hover so all header and toolbox buttons agree. */
+  /* Hover color shared by all grey subtle buttons in the toolbar and status bar. */
   --hover-bg: var(--mantine-color-gray-1);
 }
 
@@ -164,14 +164,7 @@
     0 0 0 3px var(--mantine-color-default-border);
 }
 
-.brand {
-  font-family: "Pixelify Sans", var(--mantine-font-family-headings);
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.palette-grip {
+.toolbar-grip {
   color: var(--mantine-color-dimmed);
   cursor: grab;
   touch-action: none;
