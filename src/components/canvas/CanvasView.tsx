@@ -38,7 +38,7 @@ export const CanvasView = memo(function CanvasView({ editor, tool, zoom, onZoom,
   const mergedViewportRef = useMergedRef(viewportRef, ref);
   const altDown = useAltKey();
   const view = useClientSize(viewportRef);
-  const setZoomAnchor = useZoomAnchor(zoom, stageRef, viewportRef);
+  const zoomAnchor = useZoomAnchor(zoom, view, stageRef, viewportRef);
   // The editor is mutated in place; subscribing re-renders on its changes.
   useEditorVersion(editor);
 
@@ -48,7 +48,7 @@ export const CanvasView = memo(function CanvasView({ editor, tool, zoom, onZoom,
     zoom,
     canvasRef,
     onZoomClick: (p, e) => {
-      setZoomAnchor({ imageX: p.x, imageY: p.y, clientX: e.clientX, clientY: e.clientY });
+      zoomAnchor.setAnchor({ imageX: p.x, imageY: p.y, clientX: e.clientX, clientY: e.clientY });
       onZoom(e.altKey ? -1 : 1);
     },
   });
@@ -70,6 +70,7 @@ export const CanvasView = memo(function CanvasView({ editor, tool, zoom, onZoom,
       data-tool={tool}
       data-zoom-out={tool === "zoom" && altDown ? "" : undefined}
       {...pointer}
+      onScroll={zoomAnchor.onScroll}
       style={{
         paddingInline: padding(stageWidth, view.width),
         paddingBlock: padding(stageHeight, view.height),
