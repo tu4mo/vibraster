@@ -247,11 +247,13 @@ export class Editor {
     ctx.drawImage(f.source, 0, 0);
     // A quarter turn swaps the axes, so a mirror on one becomes one on the other.
     // Drawn even when the rect and flips come out the same, as a square's would.
+    // Half-pixel offsets are truncated, not rounded: truncation is symmetric, so
+    // the next turn's offset cancels this one instead of drifting a pixel.
     this.floating = { ...f, source };
     this.drawFloating(
       {
-        x: Math.round(sel.x + (sel.w - sel.h) / 2),
-        y: Math.round(sel.y + (sel.h - sel.w) / 2),
+        x: sel.x + Math.trunc((sel.w - sel.h) / 2),
+        y: sel.y + Math.trunc((sel.h - sel.w) / 2),
         w: sel.h,
         h: sel.w,
       },
