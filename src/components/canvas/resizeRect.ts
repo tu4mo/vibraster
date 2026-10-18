@@ -5,6 +5,9 @@ import type { Rect } from "../../editor/canvas.ts";
 export const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
 export type Handle = (typeof HANDLES)[number];
 
+export const isHandle = (value: unknown): value is Handle =>
+  (HANDLES as readonly unknown[]).includes(value);
+
 type Bounds = { width: number; height: number };
 
 /**

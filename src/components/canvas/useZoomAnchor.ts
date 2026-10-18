@@ -40,6 +40,7 @@ export function useZoomAnchor(
     if (stageRef.current && viewportRef.current) {
       center.current = imageCenter(stageRef.current, viewportRef.current, zoom);
     }
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- remeasure when the viewport resizes
   }, [view.width, view.height, zoom, stageRef, viewportRef]);
 
   const setAnchor = (next: Anchor) => {

@@ -3,7 +3,7 @@ import { useRef } from "react";
 import type { Rect } from "../../editor/canvas.ts";
 import type { Editor } from "../../editor/Editor.ts";
 import type { Tool } from "../tools/tool.ts";
-import { type Handle, resizeRect } from "./resizeRect.ts";
+import { type Handle, isHandle, resizeRect } from "./resizeRect.ts";
 
 type Drag =
   | { kind: "select"; startX: number; startY: number }
@@ -51,7 +51,8 @@ export function useCanvasDrag({ editor, tool, zoom, canvasRef, onZoomClick }: Op
   const startDrag = (e: React.PointerEvent, onEmptyArea: boolean): Drag | null => {
     const p = toImage(e);
     const sel = editor.selection;
-    const handle = (e.target as HTMLElement).dataset.handle as Handle | undefined;
+    const handleName = e.target instanceof HTMLElement ? e.target.dataset.handle : undefined;
+    const handle = isHandle(handleName) ? handleName : undefined;
     const inside =
       sel && p.x >= sel.x && p.y >= sel.y && p.x <= sel.x + sel.w && p.y <= sel.y + sel.h;
 

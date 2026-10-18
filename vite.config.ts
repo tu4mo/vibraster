@@ -8,8 +8,16 @@ export default defineConfig({
   },
   fmt: {},
   lint: {
-    plugins: ["react", "typescript", "oxc"],
+    categories: {
+      correctness: "error",
+      suspicious: "error",
+    },
+    plugins: ["eslint", "import", "oxc", "react", "typescript", "unicorn"],
     rules: {
+      "react/react-in-jsx-scope": "off",
+      // Effects return a cleanup on some paths and nothing on early bail-outs.
+      "typescript/consistent-return": "off",
+      "import/no-unassigned-import": ["error", { allow: ["**/*.css"] }],
       "react/rules-of-hooks": "error",
       "react/only-export-components": [
         "warn",

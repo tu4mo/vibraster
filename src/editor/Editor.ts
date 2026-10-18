@@ -47,7 +47,9 @@ export class Editor {
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   };
 
   getVersion = () => this.version;

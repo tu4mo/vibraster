@@ -53,11 +53,19 @@ export const CanvasView = memo(function CanvasView({ editor, tool, zoom, onZoom,
     },
   });
 
-  // Selection-only changes don't touch pixels and skip the redraw.
-  const pixelVersion = editor.pixelVersion;
+  // Redraw on the editor's changes; selection-only ones don't touch pixels and skip it.
   useEffect(() => {
-    if (canvasRef.current) editor.render(canvasRef.current);
-  }, [editor, pixelVersion]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    let drawn = -1;
+    const draw = () => {
+      if (editor.pixelVersion === drawn) return;
+      drawn = editor.pixelVersion;
+      editor.render(canvas);
+    };
+    draw();
+    return editor.subscribe(draw);
+  }, [editor]);
 
   const sel = editor.selection;
   const stageWidth = editor.width * zoom;
@@ -79,7 +87,7 @@ export const CanvasView = memo(function CanvasView({ editor, tool, zoom, onZoom,
       <div ref={stageRef} className="stage" style={{ width: stageWidth, height: stageHeight }}>
         <canvas ref={canvasRef} className={zoom > 1 ? "pixelated" : undefined} />
         {zoom >= PIXEL_GRID_MIN_ZOOM && (
-          <div className="pixel-grid" style={{ "--cell": `${zoom}px` } as React.CSSProperties} />
+          <div className="pixel-grid" style={{ "--cell": `${zoom}px` }} />
         )}
         {sel && (
           <SelectionOutline

@@ -2,7 +2,9 @@ import { ActionIcon, Input, SimpleGrid } from "@mantine/core";
 import { IconPointFilled } from "@tabler/icons-react";
 import type { Anchor } from "../../editor/canvas.ts";
 
-const ANCHORS: Anchor[] = [0, 1, 2].flatMap((row) => [0, 1, 2].map((col) => [col, row] as Anchor));
+const ANCHORS = ([0, 1, 2] as const).flatMap((row) =>
+  ([0, 1, 2] as const).map((col): Anchor => [col, row]),
+);
 
 type Props = {
   value: Anchor;

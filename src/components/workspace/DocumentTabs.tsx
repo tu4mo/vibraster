@@ -1,5 +1,4 @@
 import { Scroller, Stack, Tabs } from "@mantine/core";
-import { useEffect, useRef } from "react";
 import type { Doc } from "../../editor/useDocuments.ts";
 import { DocumentTab } from "./DocumentTab.tsx";
 
@@ -16,15 +15,6 @@ type Props = {
 
 /** One tab per open image, in a strip that scrolls sideways (by arrows or wheel) when they don't fit. */
 export function DocumentTabs({ docs, activeId, onSelect, onClose, listRef, children }: Props) {
-  const strip = useRef<HTMLDivElement>(null);
-
-  // Bring the active tab into view, such as a new one opened past the edge.
-  useEffect(() => {
-    strip.current
-      ?.querySelector('[aria-selected="true"]')
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [activeId]);
-
   return (
     <Tabs
       h="100%"
@@ -35,7 +25,6 @@ export function DocumentTabs({ docs, activeId, onSelect, onClose, listRef, child
     >
       <Stack h="100%" gap={0}>
         <Scroller
-          ref={strip}
           controlSize={32}
           draggable={false}
           style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}
@@ -48,7 +37,13 @@ export function DocumentTabs({ docs, activeId, onSelect, onClose, listRef, child
             style={{ flex: 1, flexWrap: "nowrap", gap: 4 }}
           >
             {docs.map(({ id, editor }) => (
-              <DocumentTab key={id} id={id} fileName={editor.fileName} onClose={onClose} />
+              <DocumentTab
+                key={id}
+                id={id}
+                fileName={editor.fileName}
+                active={id === activeId}
+                onClose={onClose}
+              />
             ))}
           </Tabs.List>
         </Scroller>
