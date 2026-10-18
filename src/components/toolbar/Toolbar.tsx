@@ -2,6 +2,7 @@ import { Center, FloatingWindow, Stack } from "@mantine/core";
 import { type SetFloatingWindowPosition, clamp } from "@mantine/hooks";
 import { IconGripHorizontal } from "@tabler/icons-react";
 import { useLayoutEffect, useRef } from "react";
+import { useEdgeAnchor } from "./useEdgeAnchor.ts";
 
 /** Gap kept between the toolbar and the window, tabs and status bar. */
 const MARGIN = 8;
@@ -56,6 +57,10 @@ export function Toolbar({ children, top, bottom }: Props) {
     }
   }, [minTop, bottom]);
 
+  // FloatingWindow only clamps while dragging, so a resizing window could leave
+  // the toolbar off-screen; keep it on the edges it was dropped nearest.
+  const { onDragEnd } = useEdgeAnchor(toolbar, setPosition);
+
   return (
     <FloatingWindow
       withBorder
@@ -67,6 +72,7 @@ export function Toolbar({ children, top, bottom }: Props) {
       constrainToViewport
       constrainOffset={MARGIN}
       onPositionChange={onPositionChange}
+      onDragEnd={onDragEnd}
       setPositionRef={setPosition}
       dragHandleSelector=".toolbar-grip"
       // Above the app shell (100) but below modals (200) and popovers/tooltips (300).
