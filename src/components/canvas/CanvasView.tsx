@@ -1,5 +1,6 @@
 import { clamp, useMergedRef } from "@mantine/hooks";
 import { memo, useEffect, useRef } from "react";
+
 import type { Editor } from "../../editor/Editor.ts";
 import { useEditorVersion } from "../../editor/useEditorVersion.ts";
 import type { Tool } from "../tools/tool.ts";

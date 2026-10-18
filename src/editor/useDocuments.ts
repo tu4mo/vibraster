@@ -1,4 +1,5 @@
 import { type SetStateAction, useRef, useState } from "react";
+
 import { Editor } from "./Editor.ts";
 
 /** One open image (a tab): its editor plus view state kept while switching tabs. */

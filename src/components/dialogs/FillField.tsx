@@ -1,5 +1,6 @@
 import { ColorInput, Input, SegmentedControl, Stack } from "@mantine/core";
 import { useState } from "react";
+
 import { SWATCHES } from "../color/swatches.ts";
 
 type Props = {

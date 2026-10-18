@@ -5,6 +5,7 @@ import {
   IconRotate2,
   IconRotateClockwise2,
 } from "@tabler/icons-react";
+
 import type { Editor } from "../../editor/Editor.ts";
 import { Tip } from "../ui/Tip.tsx";
 

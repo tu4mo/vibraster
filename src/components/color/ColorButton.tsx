@@ -8,6 +8,7 @@ import {
   Text,
 } from "@mantine/core";
 import { useState } from "react";
+
 import { Tip } from "../ui/Tip.tsx";
 import { EyeDropperButton } from "./EyeDropperButton.tsx";
 import { HexInput } from "./HexInput.tsx";

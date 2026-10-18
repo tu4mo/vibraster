@@ -1,17 +1,18 @@
 import { AppShell, Divider } from "@mantine/core";
 import { useElementSize } from "@mantine/hooks";
 import { useState, useSyncExternalStore } from "react";
+
 import { CanvasView } from "../components/canvas/CanvasView.tsx";
+import { SelectionBar } from "../components/selection/SelectionBar.tsx";
+import { StatusBar } from "../components/statusbar/StatusBar.tsx";
+import { ZoomControls } from "../components/statusbar/ZoomControls.tsx";
 import { ClipboardButtons } from "../components/toolbar/ClipboardButtons.tsx";
 import { FileButtons } from "../components/toolbar/FileButtons.tsx";
 import { HistoryButtons } from "../components/toolbar/HistoryButtons.tsx";
 import { ImageButtons } from "../components/toolbar/ImageButtons.tsx";
 import { Toolbar } from "../components/toolbar/Toolbar.tsx";
-import { SelectionBar } from "../components/selection/SelectionBar.tsx";
-import { StatusBar } from "../components/statusbar/StatusBar.tsx";
-import { ZoomControls } from "../components/statusbar/ZoomControls.tsx";
-import { ToolButtons } from "../components/tools/ToolButtons.tsx";
 import type { Tool } from "../components/tools/tool.ts";
+import { ToolButtons } from "../components/tools/ToolButtons.tsx";
 import { DocumentTabs } from "../components/workspace/DocumentTabs.tsx";
 import { StartScreen } from "../components/workspace/StartScreen.tsx";
 import { createBlankImage } from "../editor/canvas.ts";

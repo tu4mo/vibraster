@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+
 import type { Editor } from "./Editor.ts";
 
 /** Re-renders on every change to `editor`; returns its change counter. */

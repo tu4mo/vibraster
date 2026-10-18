@@ -1,5 +1,6 @@
 import { ActionIcon, Stack } from "@mantine/core";
 import { IconArrowsMove, IconMarquee2, IconZoomIn } from "@tabler/icons-react";
+
 import { TOOLBAR_ICON } from "../toolbar/toolbarIcon.ts";
 import { Tip } from "../ui/Tip.tsx";
 import type { Tool } from "./tool.ts";

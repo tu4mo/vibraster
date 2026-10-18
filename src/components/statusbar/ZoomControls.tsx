@@ -1,5 +1,6 @@
 import { ActionIcon, Button, Group } from "@mantine/core";
 import { IconMinus, IconPlus, IconZoomScan } from "@tabler/icons-react";
+
 import { Tip } from "../ui/Tip.tsx";
 
 type Props = {

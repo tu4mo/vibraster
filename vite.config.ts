@@ -6,7 +6,9 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {},
+  fmt: {
+    sortImports: true,
+  },
   lint: {
     categories: {
       correctness: "error",

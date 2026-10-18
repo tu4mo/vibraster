@@ -4,6 +4,7 @@ import "./index.css";
 import { ActionIcon, Button, MantineProvider, createTheme } from "@mantine/core";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+
 import App from "./app/App.tsx";
 
 // Grey subtle buttons share one hover color (see --hover-bg).

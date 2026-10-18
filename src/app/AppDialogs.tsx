@@ -1,4 +1,5 @@
 import { Suspense, lazy } from "react";
+
 import type { Editor } from "../editor/Editor.ts";
 
 // Dialogs load on first use, which keeps their inputs out of the startup bundle.

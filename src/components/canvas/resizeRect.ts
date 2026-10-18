@@ -1,4 +1,5 @@
 import { clamp } from "@mantine/hooks";
+
 import type { Rect } from "../../editor/canvas.ts";
 
 /** Selection resize handles: corners and sides, named by compass direction. */

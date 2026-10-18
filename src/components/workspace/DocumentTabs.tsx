@@ -1,4 +1,5 @@
 import { Scroller, Stack, Tabs } from "@mantine/core";
+
 import type { Doc } from "../../editor/useDocuments.ts";
 import { DocumentTab } from "./DocumentTab.tsx";
 

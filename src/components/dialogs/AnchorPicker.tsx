@@ -1,5 +1,6 @@
 import { ActionIcon, Input, SimpleGrid } from "@mantine/core";
 import { IconPointFilled } from "@tabler/icons-react";
+
 import type { Anchor } from "../../editor/canvas.ts";
 
 const ANCHORS = ([0, 1, 2] as const).flatMap((row) =>

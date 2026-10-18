@@ -1,4 +1,5 @@
 import { IconFrame, IconResize } from "@tabler/icons-react";
+
 import { ToolbarButton } from "./ToolbarButton.tsx";
 import { ToolbarGroup } from "./ToolbarGroup.tsx";
 

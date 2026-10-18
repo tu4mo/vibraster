@@ -1,5 +1,6 @@
 import { clamp } from "@mantine/hooks";
 import { useRef } from "react";
+
 import type { Rect } from "../../editor/canvas.ts";
 import type { Editor } from "../../editor/Editor.ts";
 import type { Tool } from "../tools/tool.ts";

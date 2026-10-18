@@ -1,5 +1,6 @@
 import { Text } from "@mantine/core";
 import { useState } from "react";
+
 import type { Anchor } from "../../editor/canvas.ts";
 import { AnchorPicker } from "./AnchorPicker.tsx";
 import { FillField } from "./FillField.tsx";

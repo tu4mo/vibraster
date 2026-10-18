@@ -1,4 +1,5 @@
 import { type SetStateAction, useRef } from "react";
+
 import type { Editor } from "../editor/Editor.ts";
 
 const ZOOM_STEPS = [0.05, 0.1, 0.25, 1 / 3, 0.5, 2 / 3, 1, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32];

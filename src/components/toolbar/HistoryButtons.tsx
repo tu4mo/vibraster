@@ -1,4 +1,5 @@
 import { IconArrowBackUp, IconArrowForwardUp } from "@tabler/icons-react";
+
 import type { Editor } from "../../editor/Editor.ts";
 import { useEditorVersion } from "../../editor/useEditorVersion.ts";
 import { ToolbarButton } from "./ToolbarButton.tsx";

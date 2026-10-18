@@ -1,5 +1,6 @@
 import { Button, Group, Modal, Stack } from "@mantine/core";
 import type { ReactNode } from "react";
+
 import { isValidSize } from "../../editor/canvas.ts";
 
 type Size = { w: number; h: number };

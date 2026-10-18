@@ -2,6 +2,7 @@ import { Center, FloatingWindow, Stack } from "@mantine/core";
 import { type SetFloatingWindowPosition, clamp } from "@mantine/hooks";
 import { IconGripHorizontal } from "@tabler/icons-react";
 import { useLayoutEffect, useRef } from "react";
+
 import { useEdgeAnchor } from "./useEdgeAnchor.ts";
 
 /** Gap kept between the toolbar and the window, tabs and status bar. */

@@ -1,6 +1,7 @@
 import { ActionIcon } from "@mantine/core";
 import { useEyeDropper } from "@mantine/hooks";
 import { IconColorPicker } from "@tabler/icons-react";
+
 import { Tip } from "../ui/Tip.tsx";
 
 /** Picks a color from anywhere on screen; renders nothing where unsupported. */

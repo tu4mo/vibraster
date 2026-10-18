@@ -1,5 +1,6 @@
 import { Button, Group } from "@mantine/core";
 import { IconEraser } from "@tabler/icons-react";
+
 import type { Editor } from "../../editor/Editor.ts";
 import { ColorButton } from "../color/ColorButton.tsx";
 

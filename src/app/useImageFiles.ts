@@ -1,4 +1,5 @@
 import { useFileDialog } from "@mantine/hooks";
+
 import { loadImageFile } from "../editor/canvas.ts";
 import type { Editor } from "../editor/Editor.ts";
 

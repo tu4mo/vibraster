@@ -1,4 +1,5 @@
 import { ActionBar, Text } from "@mantine/core";
+
 import type { Editor } from "../../editor/Editor.ts";
 import { useEditorVersion } from "../../editor/useEditorVersion.ts";
 import type { Tool } from "../tools/tool.ts";
