@@ -3,12 +3,14 @@ import { memo, useEffect, useRef } from "react";
 
 import type { Editor } from "../../editor/Editor.ts";
 import { useEditorVersion } from "../../editor/useEditorVersion.ts";
-import type { Tool } from "../tools/tool.ts";
+import type { Tool } from "../toolbar/tool.ts";
 import { SelectionOutline } from "./SelectionOutline.tsx";
 import { useAltKey } from "./useAltKey.ts";
 import { useCanvasDrag } from "./useCanvasDrag.ts";
 import { useClientSize } from "./useClientSize.ts";
 import { useZoomAnchor } from "./useZoomAnchor.ts";
+
+import classes from "./CanvasView.module.css";
 
 /** Zoom at which the pixel grid appears (each image pixel is this many screen pixels). */
 const PIXEL_GRID_MIN_ZOOM = 6;
@@ -75,7 +77,7 @@ export const CanvasView = memo(function CanvasView({ editor, tool, zoom, onZoom,
   return (
     <div
       ref={mergedViewportRef}
-      className="viewport"
+      className={classes.viewport}
       data-tool={tool}
       data-zoom-out={tool === "zoom" && altDown ? "" : undefined}
       {...pointer}
@@ -85,10 +87,14 @@ export const CanvasView = memo(function CanvasView({ editor, tool, zoom, onZoom,
         paddingBlock: padding(stageHeight, view.height),
       }}
     >
-      <div ref={stageRef} className="stage" style={{ width: stageWidth, height: stageHeight }}>
-        <canvas ref={canvasRef} className={zoom > 1 ? "pixelated" : undefined} />
+      <div
+        ref={stageRef}
+        className={classes.stage}
+        style={{ width: stageWidth, height: stageHeight }}
+      >
+        <canvas ref={canvasRef} className={zoom > 1 ? classes.pixelated : undefined} />
         {zoom >= PIXEL_GRID_MIN_ZOOM && (
-          <div className="pixel-grid" style={{ "--cell": `${zoom}px` }} />
+          <div className={classes.pixelGrid} style={{ "--cell": `${zoom}px` }} />
         )}
         {sel && (
           <SelectionOutline

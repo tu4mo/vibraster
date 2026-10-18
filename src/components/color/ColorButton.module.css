@@ -1,0 +1,11 @@
+/* A ring in the panel color and a thin outer edge keep white or black swatches
+   visible in either theme. */
+.swatch {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 2px var(--mantine-color-body),
+    0 0 0 3px var(--mantine-color-default-border);
+}

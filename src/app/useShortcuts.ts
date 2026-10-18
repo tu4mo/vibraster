@@ -1,6 +1,6 @@
 import { useHotkeys } from "@mantine/hooks";
 
-import type { Tool } from "../components/tools/tool.ts";
+import type { Tool } from "../components/toolbar/tool.ts";
 import type { Editor } from "../editor/Editor.ts";
 
 type Options = {

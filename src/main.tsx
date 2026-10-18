@@ -1,7 +1,12 @@
 import "@mantine/core/styles.css";
 import "@mantine/dropzone/styles.css";
-import "./index.css";
-import { ActionIcon, Button, MantineProvider, createTheme } from "@mantine/core";
+import {
+  ActionIcon,
+  Button,
+  type CSSVariablesResolver,
+  MantineProvider,
+  createTheme,
+} from "@mantine/core";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -28,9 +33,32 @@ const theme = createTheme({
   },
 });
 
+// App colors that differ between the light and dark schemes.
+const cssVariablesResolver: CSSVariablesResolver = () => ({
+  variables: {},
+  light: {
+    "--checker-a": "#ffffff",
+    "--checker-b": "#d4d4d8",
+    // Hover color shared by all grey subtle buttons in the toolbar and status bar.
+    "--hover-bg": "var(--mantine-color-gray-1)",
+    // The canvas area sits a shade darker than the rest of the app.
+    "--canvas-bg": "var(--mantine-color-gray-2)",
+  },
+  dark: {
+    "--checker-a": "#3f3f46",
+    "--checker-b": "#27272a",
+    "--hover-bg": "var(--mantine-color-dark-5)",
+    "--canvas-bg": "var(--mantine-color-dark-8)",
+  },
+});
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <MantineProvider theme={theme} defaultColorScheme="auto">
+    <MantineProvider
+      theme={theme}
+      cssVariablesResolver={cssVariablesResolver}
+      defaultColorScheme="auto"
+    >
       <App />
     </MantineProvider>
   </StrictMode>,

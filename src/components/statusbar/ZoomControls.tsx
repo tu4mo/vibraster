@@ -35,7 +35,7 @@ export function ZoomControls({ zoom, disabled, onZoomBy, onActualSize, onFit }: 
           w={56}
           onClick={onActualSize}
           disabled={disabled}
-          className="tabular"
+          style={{ fontVariantNumeric: "tabular-nums" }}
         >
           {Math.round(zoom * 100)}%
         </Button>

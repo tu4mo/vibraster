@@ -2,9 +2,11 @@ import { ActionBar, Text } from "@mantine/core";
 
 import type { Editor } from "../../editor/Editor.ts";
 import { useEditorVersion } from "../../editor/useEditorVersion.ts";
-import type { Tool } from "../tools/tool.ts";
+import type { Tool } from "../toolbar/tool.ts";
 import { FillActions } from "./FillActions.tsx";
 import { TransformActions } from "./TransformActions.tsx";
+
+import classes from "./SelectionBar.module.css";
 
 type Props = {
   /** The active image's editor. */
@@ -22,8 +24,13 @@ export function SelectionBar({ editor, tool, fillColor, onFillColorChange }: Pro
   useEditorVersion(editor);
   const sel = editor.selection;
   return (
-    <ActionBar opened={sel !== null} onClose={() => editor.setSelection(null)} shadow="md">
-      <Text size="sm" c="dimmed" className="tabular">
+    <ActionBar
+      opened={sel !== null}
+      onClose={() => editor.setSelection(null)}
+      shadow="md"
+      className={classes.bar}
+    >
+      <Text size="sm" c="dimmed" style={{ fontVariantNumeric: "tabular-nums" }}>
         {sel?.w} × {sel?.h}
       </Text>
       <ActionBar.Divider />

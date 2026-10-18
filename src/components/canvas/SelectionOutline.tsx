@@ -1,6 +1,8 @@
 import type { Rect } from "../../editor/canvas.ts";
 import { HANDLES } from "./resizeRect.ts";
 
+import classes from "./SelectionOutline.module.css";
+
 type Props = {
   selection: Rect;
   zoom: number;
@@ -12,7 +14,7 @@ type Props = {
 export function SelectionOutline({ selection, zoom, withHandles }: Props) {
   return (
     <div
-      className="selection"
+      className={classes.selection}
       style={{
         left: selection.x * zoom,
         top: selection.y * zoom,
@@ -20,7 +22,8 @@ export function SelectionOutline({ selection, zoom, withHandles }: Props) {
         height: selection.h * zoom,
       }}
     >
-      {withHandles && HANDLES.map((h) => <div key={h} className="handle" data-handle={h} />)}
+      {withHandles &&
+        HANDLES.map((h) => <div key={h} className={classes.handle} data-handle={h} />)}
     </div>
   );
 }

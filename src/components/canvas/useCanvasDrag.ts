@@ -3,7 +3,7 @@ import { useRef } from "react";
 
 import type { Rect } from "../../editor/canvas.ts";
 import type { Editor } from "../../editor/Editor.ts";
-import type { Tool } from "../tools/tool.ts";
+import type { Tool } from "../toolbar/tool.ts";
 import { type Handle, isHandle, resizeRect } from "./resizeRect.ts";
 
 type Drag =

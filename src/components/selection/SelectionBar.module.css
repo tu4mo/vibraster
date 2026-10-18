@@ -1,0 +1,9 @@
+/* The ActionBar's Affix spans the full width; let presses beside the bar
+   through to the canvas area (to deselect or start a selection). */
+:global(.mantine-Affix-root):has(> .bar) {
+  pointer-events: none;
+}
+
+.bar {
+  pointer-events: auto;
+}

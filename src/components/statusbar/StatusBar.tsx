@@ -17,7 +17,7 @@ export function StatusBar({ editor, error, children }: Props) {
   // The editor is mutated in place; subscribing re-renders on its changes.
   useEditorVersion(editor);
   return (
-    <Group h="100%" px="sm" gap="lg" wrap="nowrap" className="statusbar">
+    <Group h="100%" px="sm" gap="lg" wrap="nowrap">
       {error ? (
         <Text size="xs" c="red">
           {error}

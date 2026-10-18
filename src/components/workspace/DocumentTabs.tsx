@@ -35,7 +35,8 @@ export function DocumentTabs({ docs, activeId, onSelect, onClose, listRef, child
             ref={listRef}
             aria-label="Open images"
             p={4}
-            style={{ flex: 1, flexWrap: "nowrap", gap: 4 }}
+            flex={1}
+            style={{ flexWrap: "nowrap", gap: 4 }}
           >
             {docs.map(({ id, editor }) => (
               <DocumentTab

@@ -5,6 +5,8 @@ import { useLayoutEffect, useRef } from "react";
 
 import { useEdgeAnchor } from "./useEdgeAnchor.ts";
 
+import classes from "./Toolbar.module.css";
+
 /** Gap kept between the toolbar and the window, tabs and status bar. */
 const MARGIN = 8;
 
@@ -75,13 +77,13 @@ export function Toolbar({ children, top, bottom }: Props) {
       onPositionChange={onPositionChange}
       onDragEnd={onDragEnd}
       setPositionRef={setPosition}
-      dragHandleSelector=".toolbar-grip"
+      dragHandleSelector={`.${classes.grip}`}
       // Above the app shell (100) but below modals (200) and popovers/tooltips (300).
       zIndex={150}
       aria-label="Toolbar"
     >
       <Stack gap={4} align="center">
-        <Center className="toolbar-grip" w={34} h={12} aria-hidden>
+        <Center className={classes.grip} c="dimmed" w={34} h={12} aria-hidden>
           <IconGripHorizontal size={14} />
         </Center>
         {children}

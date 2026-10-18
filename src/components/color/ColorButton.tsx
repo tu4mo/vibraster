@@ -14,6 +14,8 @@ import { EyeDropperButton } from "./EyeDropperButton.tsx";
 import { HexInput } from "./HexInput.tsx";
 import { SWATCHES } from "./swatches.ts";
 
+import classes from "./ColorButton.module.css";
+
 type Props = {
   label: string;
   color: string;
@@ -48,7 +50,7 @@ export function ColorButton({ label, color, onChange, position = "top" }: Props)
             aria-label={label}
             onClick={() => setOpened((o) => !o)}
             withShadow={false}
-            className="color-swatch"
+            className={classes.swatch}
           />
         </Tip>
       </Popover.Target>

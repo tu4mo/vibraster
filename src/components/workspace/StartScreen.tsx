@@ -1,4 +1,4 @@
-import { Button, Center, EmptyState, Group } from "@mantine/core";
+import { Button, Center, EmptyState, Flex, Group } from "@mantine/core";
 import { IconFilePlus, IconFolderOpen, IconPhoto } from "@tabler/icons-react";
 
 type Props = {
@@ -11,7 +11,7 @@ type Props = {
 /** Shown with no image open. */
 export function StartScreen({ onOpen, onNew, ref }: Props) {
   return (
-    <div ref={ref} className="viewport">
+    <Flex ref={ref} h="100%" bg="var(--canvas-bg)">
       <Center flex={1}>
         <EmptyState
           icon={<IconPhoto size={32} stroke={1.5} />}
@@ -29,6 +29,6 @@ export function StartScreen({ onOpen, onNew, ref }: Props) {
           </Group>
         </EmptyState>
       </Center>
-    </div>
+    </Flex>
   );
 }
