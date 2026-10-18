@@ -5,19 +5,22 @@
   --checker-b: #d4d4d8;
   /* Hover color shared by all grey subtle buttons in the toolbar and status bar. */
   --hover-bg: var(--mantine-color-gray-1);
+  /* The canvas area sits a shade darker than the rest of the app. */
+  --canvas-bg: var(--mantine-color-gray-2);
 }
 
 [data-mantine-color-scheme="dark"] {
   --checker-a: #3f3f46;
   --checker-b: #27272a;
   --hover-bg: var(--mantine-color-dark-5);
+  --canvas-bg: var(--mantine-color-dark-8);
 }
 
 .viewport {
   display: flex;
   height: 100%;
   overflow: auto;
-  background: var(--mantine-color-body);
+  background: var(--canvas-bg);
   user-select: none;
 
   /* The whole viewport takes presses; the select tool can start a selection
