@@ -19,6 +19,8 @@ export function DocumentTab({ id, fileName, active, onClose }: Props) {
         <CloseButton
           component="span"
           size="xs"
+          // Overhangs the 14px text so the tab is no taller than one without it.
+          my={-2}
           aria-hidden
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation();

@@ -1,4 +1,4 @@
-import { AppShell, Divider } from "@mantine/core";
+import { AppShell, Box, Divider } from "@mantine/core";
 import { useElementSize } from "@mantine/hooks";
 import { useState, useSyncExternalStore } from "react";
 
@@ -14,7 +14,6 @@ import type { Tool } from "../components/toolbar/tool.ts";
 import { Toolbar } from "../components/toolbar/Toolbar.tsx";
 import { ToolButtons } from "../components/toolbar/ToolButtons.tsx";
 import { DocumentTabs } from "../components/workspace/DocumentTabs.tsx";
-import { StartScreen } from "../components/workspace/StartScreen.tsx";
 import { createBlankImage } from "../editor/canvas.ts";
 import { Editor } from "../editor/Editor.ts";
 import { useDocuments } from "../editor/useDocuments.ts";
@@ -75,8 +74,7 @@ export default function App() {
 
   return (
     <AppShell footer={{ height: FOOTER_HEIGHT }} padding={0}>
-      {/* The tab strip only shows with an image open. */}
-      <Toolbar top={hasImage ? tabListHeight : 0} bottom={FOOTER_HEIGHT}>
+      <Toolbar top={tabListHeight} bottom={FOOTER_HEIGHT}>
         <FileButtons
           hasImage={hasImage}
           onNew={() => setDialog("new")}
@@ -109,28 +107,26 @@ export default function App() {
 
       {/* Border-box: the full height less the footer padding. */}
       <AppShell.Main h="100dvh">
-        {hasImage ? (
-          <DocumentTabs
-            listRef={tabListRef}
-            docs={documents.docs}
-            activeId={documents.activeId}
-            onSelect={documents.select}
-            onClose={documents.close}
-          >
-            {(doc) => (
-              <CanvasView
-                // Only the active tab's view is measured to fit the zoom.
-                ref={doc === documents.active ? viewport : undefined}
-                editor={doc.editor}
-                tool={tool}
-                zoom={doc.zoom}
-                onZoom={zoomBy}
-              />
-            )}
-          </DocumentTabs>
-        ) : (
-          <StartScreen ref={viewport} onOpen={files.chooseFiles} onNew={() => setDialog("new")} />
-        )}
+        <DocumentTabs
+          listRef={tabListRef}
+          docs={documents.docs}
+          activeId={documents.activeId}
+          onSelect={documents.select}
+          onClose={documents.close}
+          // Measured to fit the first image's zoom.
+          empty={<Box ref={viewport} h="100%" bg="var(--canvas-bg)" />}
+        >
+          {(doc) => (
+            <CanvasView
+              // Only the active tab's view is measured to fit the zoom.
+              ref={doc === documents.active ? viewport : undefined}
+              editor={doc.editor}
+              tool={tool}
+              zoom={doc.zoom}
+              onZoom={zoomBy}
+            />
+          )}
+        </DocumentTabs>
         <SelectionBar
           editor={editor}
           tool={tool}
