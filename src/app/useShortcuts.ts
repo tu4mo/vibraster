@@ -1,4 +1,4 @@
-import { useHotkeys } from "@mantine/hooks";
+import { type HotkeyItem, useHotkeys } from "@mantine/hooks";
 
 import type { Tool } from "../components/toolbar/tool.ts";
 import type { Editor } from "../editor/Editor.ts";
@@ -6,6 +6,7 @@ import type { Editor } from "../editor/Editor.ts";
 type Options = {
   /** The active image's editor. */
   editor: Editor;
+  tool: Tool;
   hasImage: boolean;
   hasSelection: boolean;
   dialogOpen: boolean;
@@ -21,6 +22,7 @@ type Options = {
 /** The app's keyboard shortcuts. */
 export function useShortcuts({
   editor,
+  tool,
   hasImage,
   hasSelection,
   dialogOpen,
@@ -34,7 +36,24 @@ export function useShortcuts({
 }: Options) {
   // Shortcuts only act with an image open and no dialog showing.
   const editing = hasImage && !dialogOpen;
+
+  // Arrows nudge the selection a pixel, or ten with Shift: the move tool moves
+  // its pixels, the select tool only the outline.
+  const nudges = ARROWS.flatMap(([key, dx, dy]): HotkeyItem[] =>
+    [1, 10].map((step) => [
+      step === 1 ? key : `shift+${key}`,
+      (e) => {
+        if (!editing || !hasSelection || !arrowsFree()) return;
+        e.preventDefault();
+        if (tool === "move") editor.nudgePixels(dx * step, dy * step);
+        else editor.nudgeOutline(dx * step, dy * step);
+      },
+      { preventDefault: false },
+    ]),
+  );
+
   useHotkeys([
+    ...nudges,
     ["mod+O", () => !dialogOpen && chooseFiles()],
     ["mod+shift+Z", () => editing && editor.redo()],
     ["mod+Z", () => editing && editor.undo()],
@@ -72,4 +91,20 @@ export function useShortcuts({
     ["Z", () => editing && setTool("zoom")],
     ["F", () => editing && editor.fill(fillColor)],
   ]);
+}
+
+const ARROWS = [
+  ["ArrowLeft", -1, 0],
+  ["ArrowRight", 1, 0],
+  ["ArrowUp", 0, -1],
+  ["ArrowDown", 0, 1],
+] as const;
+
+/**
+ * Whether arrow keys are free for nudging: nothing has focus, or a plain
+ * button does. Tabs, menus and other widgets with roles use arrows themselves.
+ */
+function arrowsFree() {
+  const el = document.activeElement;
+  return el === document.body || (el instanceof HTMLButtonElement && !el.hasAttribute("role"));
 }

@@ -72,6 +72,13 @@ export function clipRect(rect: Rect, width: number, height: number): Rect | null
   return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
 }
 
+/** Copy the pixels under `rect` into a new canvas of its size. */
+export function cropCanvas(source: HTMLCanvasElement, rect: Rect): HTMLCanvasElement {
+  const out = createCanvas(rect.w, rect.h);
+  context2d(out).drawImage(source, -rect.x, -rect.y);
+  return out;
+}
+
 /**
  * Scale an image to a new size. Large downscales are done in halving steps,
  * which avoids the aliasing a single drawImage call produces.

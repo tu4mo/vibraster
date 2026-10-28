@@ -6,6 +6,7 @@ import {
   cloneCanvas,
   context2d,
   createCanvas,
+  cropCanvas,
   isValidSize,
   resizeCanvasArea,
   sameRect,
@@ -188,6 +189,23 @@ export class Editor {
     this.emit();
   }
 
+  /** Shift the selection outline by whole pixels, keeping it inside the image. */
+  nudgeOutline(dx: number, dy: number) {
+    const sel = this.selection;
+    if (!sel) return;
+    const x = Math.min(Math.max(sel.x + dx, 0), this.width - sel.w);
+    const y = Math.min(Math.max(sel.y + dy, 0), this.height - sel.h);
+    this.setSelection({ ...sel, x, y });
+  }
+
+  /** Shift the selected pixels by whole pixels, lifting them first if needed. */
+  nudgePixels(dx: number, dy: number) {
+    this.beginMove();
+    const f = this.floating;
+    if (!f) return;
+    this.moveFloatingTo(f.x + dx, f.y + dy);
+  }
+
   /**
    * Scale the floating pixels to fill `rect`, mirrored as given. Always drawn
    * from the original pixels, so repeated scaling doesn't degrade them.
@@ -303,6 +321,16 @@ export class Editor {
 
   resizeCanvas(width: number, height: number, anchor: Anchor, background: string | null) {
     this.replaceImage((image) => resizeCanvasArea(image, width, height, anchor, background));
+  }
+
+  /** Trim the image to the selection. */
+  cropToSelection() {
+    if (!this.image) return;
+    this.mergeFloating();
+    // Read after merging, which can clip the selection away.
+    const sel = this.selection;
+    if (!sel) return;
+    this.replaceImage((image) => cropCanvas(image, sel));
   }
 
   /** Swap in a new image made from the current one, and drop the selection. */

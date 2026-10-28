@@ -3,6 +3,7 @@ import { ActionBar, Text } from "@mantine/core";
 import type { Editor } from "../../editor/Editor.ts";
 import { useEditorVersion } from "../../editor/useEditorVersion.ts";
 import type { Tool } from "../toolbar/tool.ts";
+import { CropButton } from "./CropButton.tsx";
 import { FillActions } from "./FillActions.tsx";
 import { TransformActions } from "./TransformActions.tsx";
 
@@ -11,7 +12,7 @@ import classes from "./SelectionBar.module.css";
 type Props = {
   /** The active image's editor. */
   editor: Editor;
-  /** The move tool offers transforms; other tools offer fill and delete. */
+  /** The move tool offers transforms; other tools offer fill, delete and crop. */
   tool: Tool;
   /** The color Fill uses, picked next to the button. */
   fillColor: string;
@@ -37,7 +38,14 @@ export function SelectionBar({ editor, tool, fillColor, onFillColorChange }: Pro
       {tool === "move" ? (
         <TransformActions editor={editor} />
       ) : (
-        <FillActions editor={editor} fillColor={fillColor} onFillColorChange={onFillColorChange} />
+        <>
+          <FillActions
+            editor={editor}
+            fillColor={fillColor}
+            onFillColorChange={onFillColorChange}
+          />
+          <CropButton editor={editor} />
+        </>
       )}
     </ActionBar>
   );

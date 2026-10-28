@@ -60,6 +60,7 @@ export default function App() {
 
   useShortcuts({
     editor,
+    tool,
     hasImage,
     hasSelection,
     dialogOpen: dialog !== null,
